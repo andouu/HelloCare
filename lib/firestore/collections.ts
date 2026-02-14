@@ -1,6 +1,7 @@
 /**
- * Central definition of Firestore collection names.
- * Use these constants so security rules and client code stay in sync.
+ * Central definition of Firestore collection names and paths.
+ * Security rules in firestore.rules must match these names/paths.
+ * Deploy rules: firebase deploy --only firestore:rules
  * All names are lowerCamelCase.
  */
 export const COLLECTIONS = {
