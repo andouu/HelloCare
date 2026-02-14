@@ -18,7 +18,11 @@ export function AppointmentClient() {
     clearError,
     clearTranscript,
     isSupported,
+    tokenStatus,
+    tokenError,
   } = useStreamingTranscription({ language: "en-US" });
+
+  const canRecord = isSupported && tokenStatus === "ready";
 
   const fullTranscript = segments.map((s) => s.text).filter(Boolean).join(" ");
   const hasTranscript = segments.length > 0;
@@ -37,13 +41,25 @@ export function AppointmentClient() {
 
       <p className="mb-6 text-zinc-600 dark:text-zinc-400">
         During your appointment, click <strong>Record</strong> to capture your voice.
-        Speech is transcribed live as you speak (no delay). You can start and stop as
+        Speech is transcribed live as you speak. You can start and stop as
         needed. The full transcript appears below.
       </p>
       {!isSupported && (
         <p className="mb-4 text-sm text-amber-700 dark:text-amber-400" role="status">
           Live transcription works best in Chrome or Edge. Other browsers may not support it.
         </p>
+      )}
+      {tokenStatus === "loading" && (
+        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400" role="status">
+          Preparing transcription…
+        </p>
+      )}
+      {tokenStatus === "error" && tokenError && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+          <p className="text-sm text-amber-800 dark:text-amber-200" role="alert">
+            Could not prepare transcription: {tokenError.message}. Try refreshing the page.
+          </p>
+        </div>
       )}
 
       <section className={formStyles.section}>
@@ -54,7 +70,7 @@ export function AppointmentClient() {
             className={isRecording ? formStyles.buttonRecordActive : formStyles.buttonRecord}
             aria-pressed={isRecording}
             aria-label={isRecording ? "Stop recording" : "Start recording"}
-            disabled={!isSupported}
+            disabled={!canRecord}
           >
             {isRecording ? "Stop recording" : "Record"}
           </button>

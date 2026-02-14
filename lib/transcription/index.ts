@@ -1,7 +1,6 @@
 /**
- * Transcription module: types, API client, and hooks.
- * - useStreamingTranscription: live streaming (Web Speech API, no chunk delay).
- * - useRecordingTranscription: chunked Whisper API (optional fallback).
+ * Transcription module: streaming via OpenAI Realtime API (WebRTC).
+ * Ephemeral token is minted by the server; the API key never touches the client.
  */
 
 export type {
@@ -11,9 +10,10 @@ export type {
   StreamingTranscriptionCallbacks,
   StreamingTranscriptionSource,
 } from "./types";
-export { transcribeAudio } from "./transcribeClient";
 export { useStreamingTranscription } from "./useStreamingTranscription";
-export type { UseStreamingTranscriptionOptions, UseStreamingTranscriptionReturn } from "./useStreamingTranscription";
-export { useRecordingTranscription } from "./useRecordingTranscription";
-export type { UseRecordingTranscriptionOptions, UseRecordingTranscriptionReturn } from "./useRecordingTranscription";
-export { createSpeechRecognitionSource, isSpeechRecognitionSupported } from "./sources/speechRecognitionSource";
+export type {
+  TokenStatus,
+  UseStreamingTranscriptionOptions,
+  UseStreamingTranscriptionReturn,
+} from "./useStreamingTranscription";
+export { createRealtimeWebRTCSource, isRealtimeWebRTCSupported } from "./sources/realtimeWebRTCSource";

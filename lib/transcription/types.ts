@@ -22,7 +22,7 @@ export type TranscribeApiResponse =
   | { ok: true; text: string }
   | { ok: false; error: string };
 
-/** Callbacks for a streaming transcription source (e.g. Web Speech API or future Realtime API). */
+/** Callbacks for a streaming transcription source (e.g. Realtime API WebRTC). */
 export type StreamingTranscriptionCallbacks = {
   onInterim?: (text: string) => void;
   onFinal: (text: string) => void;
