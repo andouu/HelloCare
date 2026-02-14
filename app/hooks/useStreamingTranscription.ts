@@ -5,6 +5,11 @@ import type {
   StreamingTranscriber,
   TurnEvent,
 } from "assemblyai";
+import {
+  STREAMING_KEYTERMS_MEDICATIONS,
+  STREAMING_KEYTERMS_MEDICAL_TERMS,
+} from "@/lib/assemblyai/keyterms";
+import { debugLog } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +73,12 @@ export function useStreamingTranscription(
 
   // ---- refs ----------------------------------------------------------------
   const tokenRef = useRef<string | null>(null);
+  const turnDetectionRef = useRef<{
+    endOfTurnConfidenceThreshold: number;
+    minEndOfTurnSilenceWhenConfident: number;
+    maxTurnSilence: number;
+  } | null>(null);
+  const keytermsEnabledRef = useRef<boolean>(false);
   const transcriberRef = useRef<StreamingTranscriber | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -97,9 +108,19 @@ export function useStreamingTranscription(
               `Token request failed (${res.status})`,
           );
         }
-        const data: { token: string } = await res.json();
+        const data = (await res.json()) as {
+          token: string;
+          turnDetection?: {
+            endOfTurnConfidenceThreshold: number;
+            minEndOfTurnSilenceWhenConfident: number;
+            maxTurnSilence: number;
+          };
+          keytermsEnabled?: boolean;
+        };
         if (!cancelled) {
           tokenRef.current = data.token;
+          turnDetectionRef.current = data.turnDetection ?? null;
+          keytermsEnabledRef.current = data.keytermsEnabled ?? false;
           setTokenStatus("ready");
         }
       } catch (err) {
@@ -191,12 +212,29 @@ export function useStreamingTranscription(
       audioContextRef.current = audioContext;
       const actualSampleRate = audioContext.sampleRate;
 
-      // 4. Create & configure the streaming transcriber.
+
+      // 4. Create & configure the streaming transcriber (turn detection + keyterms from API/env).
       committedTurnOrdersRef.current.clear();
+      const turnDetection = turnDetectionRef.current;
+      const keytermsEnabled = keytermsEnabledRef.current;
+      debugLog("Key terms are enabled:" + keytermsEnabled);
+
       const transcriber = new ST({
         sampleRate: actualSampleRate,
         formatTurns: true,
         token: tokenRef.current,
+        ...(keytermsEnabled && {
+          keytermsPrompt: [
+            ...STREAMING_KEYTERMS_MEDICATIONS,
+            ...STREAMING_KEYTERMS_MEDICAL_TERMS,
+          ],
+        }),
+        ...(turnDetection && {
+          endOfTurnConfidenceThreshold: turnDetection.endOfTurnConfidenceThreshold,
+          minEndOfTurnSilenceWhenConfident:
+            turnDetection.minEndOfTurnSilenceWhenConfident,
+          maxTurnSilence: turnDetection.maxTurnSilence,
+        }),
       });
 
       transcriber.on("open", ({ id }) => {
