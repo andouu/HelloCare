@@ -1,7 +1,7 @@
 /**
  * Firestore API layer: pure read/write commands.
+ * Schema: users/{uid} for metadata; users/{uid}/{subcollection}/{id} for entries.
  * All functions require userId so they work with auth and are testable.
- * Use these from hooks or from server/API routes (with a verified token).
  */
 
 import {
@@ -9,50 +9,57 @@ import {
   getDoc,
   setDoc,
   type Firestore,
-  type DocumentReference,
   type DocumentSnapshot,
+  Timestamp,
 } from "firebase/firestore";
-import { COLLECTIONS, userDocPathSegments, USER_PATHS } from "./collections";
-import type { CollectionKey } from "./collections";
+import {
+  COLLECTIONS,
+  userDocRefSegments,
+  userSubcollectionDocRefSegments,
+  type UserSubcollectionKey,
+} from "./collections";
 import { toFirestoreValue } from "./serialize";
-import type { ActionItem, HealthNote, SessionMetadata, UserDataDoc } from "./types";
+import type {
+  ActionItem,
+  HealthNote,
+  SessionMetadata,
+  UserMetadata,
+  UserMetadataUpdatePayload,
+} from "./types";
 import type { FirestoreResult } from "./types";
 
-function getUserDataDocRef(db: Firestore, uid: string): DocumentReference {
-  return doc(db, ...userDocPathSegments(uid, USER_PATHS.userData));
+function getUserDocRef(db: Firestore, uid: string) {
+  return doc(db, ...userDocRefSegments(uid));
 }
 
-/**
- * Returns a document reference for a top-level collection by id.
- * Reusable for any collection that uses document id as the key.
- */
-function getCollectionDocRef(
-  db: Firestore,
-  collectionName: (typeof COLLECTIONS)[CollectionKey],
-  docId: string
-): DocumentReference {
-  return doc(db, collectionName, docId);
-}
-
-function snapshotToUserData(snap: DocumentSnapshot): UserDataDoc | null {
+function snapshotToUserMetadata(snap: DocumentSnapshot): UserMetadata | null {
   const data = snap.data();
-  if (!data || typeof data.message !== "string" || typeof data.updatedAt !== "string") {
-    return null;
-  }
-  return { message: data.message, updatedAt: data.updatedAt };
+  if (!data) return null;
+  // Doc must have createDate (we write it); accept Firestore Timestamp.
+  const createDate = data.createDate;
+  if (createDate == null) return null;
+  return {
+    id: snap.id,
+    createDate: createDate as UserMetadata["createDate"],
+    email: typeof data.email === "string" ? data.email : undefined,
+    firstName: typeof data.firstName === "string" ? data.firstName : "",
+    lastName: typeof data.lastName === "string" ? data.lastName : "",
+    preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,
+    hospitalPhoneNumber: typeof data.hospitalPhoneNumber === "string" ? data.hospitalPhoneNumber : undefined,
+  };
 }
 
 /**
- * Reads the user's data document (users/{uid}/data/userData). Returns null if missing or invalid.
+ * Reads the user metadata document at users/{uid}. Returns null if missing or invalid.
  */
-export async function readUserDataDoc(
+export async function readUserMetadata(
   db: Firestore,
   uid: string
-): Promise<FirestoreResult<UserDataDoc | null>> {
+): Promise<FirestoreResult<UserMetadata | null>> {
   try {
-    const ref = getUserDataDocRef(db, uid);
+    const ref = getUserDocRef(db, uid);
     const snap = await getDoc(ref);
-    const data = snapshotToUserData(snap);
+    const data = snapshotToUserMetadata(snap);
     return { ok: true, data };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err : new Error(String(err)) };
@@ -60,17 +67,25 @@ export async function readUserDataDoc(
 }
 
 /**
- * Writes the user's data document. Creates or overwrites.
+ * Writes the user metadata document at users/{uid}. Creates or overwrites.
+ * createDate is set to now if not provided.
  */
-export async function writeUserDataDoc(
+export async function writeUserMetadata(
   db: Firestore,
   uid: string,
-  payload: { message: string }
-): Promise<FirestoreResult<UserDataDoc>> {
+  payload: UserMetadataUpdatePayload
+): Promise<FirestoreResult<UserMetadata>> {
   try {
-    const ref = getUserDataDocRef(db, uid);
-    const now = new Date().toISOString();
-    const docData: UserDataDoc = { message: payload.message, updatedAt: now };
+    const ref = getUserDocRef(db, uid);
+    const docData: UserMetadata = {
+      id: uid,
+      email: payload.email,
+      firstName: payload.firstName ?? "",
+      lastName: payload.lastName ?? "",
+      preferredLanguage: payload.preferredLanguage ?? "en",
+      hospitalPhoneNumber: payload.hospitalPhoneNumber ?? "",
+      createDate: Timestamp.now(),
+    };
     await setDoc(ref, docData);
     return { ok: true, data: docData };
   } catch (err) {
@@ -79,17 +94,18 @@ export async function writeUserDataDoc(
 }
 
 /**
- * Writes a document to a top-level collection by id. Serializes Date to Timestamp.
- * Reusable for any collection type; use the typed write functions for specific types.
+ * Writes a document to a user subcollection. Path: users/{uid}/{subcollection}/{id}.
+ * Serializes Date to Timestamp. Ensures userId is set on the document for rules.
  */
-async function writeCollectionDoc<T extends { id: string }>(
+async function writeUserSubcollectionDoc<T extends { id: string; userId: string }>(
   db: Firestore,
-  collectionName: (typeof COLLECTIONS)[CollectionKey],
+  uid: string,
+  subcollection: UserSubcollectionKey,
   data: T
 ): Promise<FirestoreResult<T>> {
   try {
-    const ref = getCollectionDocRef(db, collectionName, data.id);
-    const serialized = toFirestoreValue(data) as Record<string, unknown>;
+    const ref = doc(db, ...userSubcollectionDocRefSegments(uid, subcollection, data.id));
+    const serialized = toFirestoreValue({ ...data, userId: uid }) as Record<string, unknown>;
     await setDoc(ref, serialized);
     return { ok: true, data };
   } catch (err) {
@@ -97,32 +113,34 @@ async function writeCollectionDoc<T extends { id: string }>(
   }
 }
 
-/**
- * Writes a health note to Firestore. Uses healthNotes collection and document id.
- */
 export async function writeHealthNote(
   db: Firestore,
-  data: HealthNote
+  uid: string,
+  data: Omit<HealthNote, "userId"> & { userId?: string }
 ): Promise<FirestoreResult<HealthNote>> {
-  return writeCollectionDoc(db, COLLECTIONS.healthNotes, data);
+  const docData: HealthNote = { ...data, userId: uid };
+  return writeUserSubcollectionDoc(db, uid, "healthNotes", docData);
 }
 
-/**
- * Writes an action item to Firestore. Uses actionItems collection and document id.
- */
 export async function writeActionItem(
   db: Firestore,
-  data: ActionItem
+  uid: string,
+  data: Omit<ActionItem, "userId"> & { userId?: string }
 ): Promise<FirestoreResult<ActionItem>> {
-  return writeCollectionDoc(db, COLLECTIONS.actionItems, data);
+  const docData: ActionItem = { ...data, userId: uid };
+  return writeUserSubcollectionDoc(db, uid, "actionItems", docData);
 }
 
-/**
- * Writes a session metadata document to Firestore. Uses sessionMetadata collection and document id.
- */
 export async function writeSessionMetadata(
   db: Firestore,
-  data: SessionMetadata
+  uid: string,
+  data: Omit<SessionMetadata, "userId"> & { userId?: string }
 ): Promise<FirestoreResult<SessionMetadata>> {
-  return writeCollectionDoc(db, COLLECTIONS.sessionMetadata, data);
+  const docData: SessionMetadata = {
+    ...data,
+    userId: uid,
+    actionItems: data.actionItems ?? [],
+    documentIds: data.documentIds ?? [],
+  };
+  return writeUserSubcollectionDoc(db, uid, "sessionMetadata", docData);
 }

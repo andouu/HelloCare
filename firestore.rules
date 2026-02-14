@@ -8,24 +8,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // User-private data: only the owner can read/write.
-    // Path: users/{uid}/data/userData (and any future user subcollections).
-    match /users/{userId}/{document=**} {
+    match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Top-level collections: documents must have userId field matching the requester.
-    // healthNotes, actionItems, sessionMetadata.
-    match /healthNotes/{docId} {
+    match /users/{userId}/healthNotes/{docId} {
       allow read, write: if request.auth != null
         && (resource == null || resource.data.userId == request.auth.uid)
         && (request.resource == null || request.resource.data.userId == request.auth.uid);
     }
-    match /actionItems/{docId} {
+    match /users/{userId}/actionItems/{docId} {
       allow read, write: if request.auth != null
         && (resource == null || resource.data.userId == request.auth.uid)
         && (request.resource == null || request.resource.data.userId == request.auth.uid);
     }
-    match /sessionMetadata/{docId} {
+    match /users/{userId}/sessionMetadata/{docId} {
       allow read, write: if request.auth != null
         && (resource == null || resource.data.userId == request.auth.uid)
         && (request.resource == null || request.resource.data.userId == request.auth.uid);

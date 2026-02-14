@@ -1,38 +1,53 @@
 /**
  * Central definition of Firestore collection names and paths.
- * Security rules in firestore.rules must match these names/paths.
- * Deploy rules: firebase deploy --only firestore:rules
+ * Use these constants so security rules and client code stay in sync.
  * All names are lowerCamelCase.
+ *
+ * Schema:
+ * - users/{uid}                    — user metadata document
+ * - users/{uid}/healthNotes/{id}   — health notes subcollection
+ * - users/{uid}/actionItems/{id}   — action items subcollection
+ * - users/{uid}/sessionMetadata/{id} — session metadata subcollection
  */
 export const COLLECTIONS = {
-  /** User-private data: users/{uid}/... */
+  /** Top-level users collection: users/{uid} and subcollections under it */
   users: "users",
-  /** Health notes: healthNotes/{id}, field userId for rules */
-  healthNotes: "healthNotes",
-  /** Action items: actionItems/{id}, field userId for rules */
-  actionItems: "actionItems",
-  /** Session metadata: sessionMetadata/{id}, field userId for rules */
-  sessionMetadata: "sessionMetadata",
 } as const;
 
 export type CollectionKey = keyof typeof COLLECTIONS;
 
-/** Path segments for user subcollections or docs under users/{uid}. */
+/** Subcollection names under users/{uid}. */
 export const USER_PATHS = {
-  userData: "data/userData",
+  /** Health notes: users/{userId}/healthNotes/{id} */
+  healthNotes: "healthNotes",
+  /** Action items: users/{userId}/actionItems/{id} */
+  actionItems: "actionItems",
+  /** Session metadata: users/{userId}/sessionMetadata/{id} */
+  sessionMetadata: "sessionMetadata",
 } as const;
 
-/**
- * Builds the full path for a user-scoped document.
- * Example: userDocPath(uid, USER_PATHS.userData) => "users/{uid}/data/userData"
- */
-export function userDocPath(uid: string, relativePath: string): string {
-  return `${COLLECTIONS.users}/${uid}/${relativePath}`;
+export type UserSubcollectionKey = keyof typeof USER_PATHS;
+
+/** Path segments for the user document ref: doc(db, ...) => users/{uid} */
+export function userDocRefSegments(uid: string): [string, string] {
+  return [COLLECTIONS.users, uid];
 }
 
 /**
- * Returns path segments for doc(db, ...segments).
- * Example: userDocPathSegments(uid, "data/userData") => ["users", uid, "data", "userData"]
+ * Path segments for a document in a user subcollection.
+ * Example: doc(db, ...userSubcollectionDocRefSegments(uid, "healthNotes", id))
+ */
+export function userSubcollectionDocRefSegments(
+  uid: string,
+  subcollection: UserSubcollectionKey,
+  docId: string
+): [string, string, string, string] {
+  return [COLLECTIONS.users, uid, USER_PATHS[subcollection], docId];
+}
+
+/**
+ * Path segments for a relative path under users/{uid}.
+ * Example: userDocPathSegments(uid, "healthNotes/abc") => ["users", uid, "healthNotes", "abc"]
  */
 export function userDocPathSegments(uid: string, relativePath: string): [string, string, ...string[]] {
   const parts = relativePath.split("/").filter(Boolean);

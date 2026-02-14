@@ -3,11 +3,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
-import { readUserDataDoc, writeUserDataDoc } from "./api";
-import type { UserDataDoc } from "./types";
+import { debugLog } from "@/lib/logger";
+import {
+  readUserMetadata,
+  writeUserMetadata,
+  writeHealthNote,
+  writeActionItem,
+  writeSessionMetadata,
+} from "./api";
+import type { UserMetadata, UserMetadataUpdatePayload } from "./types";
+import type {
+  HealthNoteCreate,
+  ActionItemCreate,
+  SessionMetadataCreate,
+} from "./types";
+import type { EntryType } from "./types";
 
-type UserDataState = {
-  data: UserDataDoc | null;
+type UserMetadataState = {
+  data: UserMetadata | null;
   loading: boolean;
   error: Error | null;
 };
@@ -18,34 +31,30 @@ type WriteState = {
 };
 
 /**
- * Hook to read and write the authenticated user's Firestore data document (users/{uid}/data/userData).
- * Only runs when user is signed in. Exposes data, loading, error, refetch, and write.
+ * Hook to read the authenticated user's metadata document (users/{uid}).
+ * Only runs when user is signed in. Use for post-sign-in user profile/metadata.
  */
-export function useUserData() {
+export function useUserMetadata() {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
 
-  const [readState, setReadState] = useState<UserDataState>({
+  const [state, setState] = useState<UserMetadataState>({
     data: null,
     loading: true,
-    error: null,
-  });
-  const [writeState, setWriteState] = useState<WriteState>({
-    writing: false,
     error: null,
   });
 
   const refetch = useCallback(async () => {
     if (!uid) {
-      setReadState((s) => ({ ...s, loading: false }));
+      setState((s) => ({ ...s, loading: false }));
       return;
     }
-    setReadState((s) => ({ ...s, loading: true, error: null }));
-    const result = await readUserDataDoc(db, uid);
+    setState((s) => ({ ...s, loading: true, error: null }));
+    const result = await readUserMetadata(db, uid);
     if (result.ok) {
-      setReadState({ data: result.data, loading: false, error: null });
+      setState({ data: result.data, loading: false, error: null });
     } else {
-      setReadState((s) => ({ ...s, loading: false, error: result.error }));
+      setState((s) => ({ ...s, loading: false, error: result.error }));
     }
   }, [uid]);
 
@@ -53,15 +62,85 @@ export function useUserData() {
     refetch();
   }, [refetch]);
 
-  const write = useCallback(
-    async (message: string) => {
-      if (!uid) return;
-      setWriteState({ writing: true, error: null });
-      const result = await writeUserDataDoc(db, uid, { message });
+  const saveProfile = useCallback(
+    async (payload: UserMetadataUpdatePayload) => {
+      if (!uid) return { ok: false as const, error: new Error("Not signed in") };
+      const result = await writeUserMetadata(db, uid, payload);
       if (result.ok) {
+        setState((s) => ({ ...s, data: result.data, error: null }));
+      }
+      return result;
+    },
+    [uid]
+  );
+
+  return {
+    data: state.data,
+    loading: state.loading,
+    error: state.error,
+    refetch,
+    saveProfile,
+    isAuthenticated: !!uid,
+  };
+}
+
+function generateId(): string {
+  return crypto.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/**
+ * Hook to write entries to the authenticated user's subcollections.
+ * Exposes save(entryType, payload) and write state.
+ */
+export function useSaveEntry() {
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+  const [writeState, setWriteState] = useState<WriteState>({
+    writing: false,
+    error: null,
+  });
+
+  const save = useCallback(
+    async (
+      entryType: EntryType,
+      payload: HealthNoteCreate | ActionItemCreate | SessionMetadataCreate
+    ) => {
+      if (!uid) return;
+      const id = "id" in payload && payload.id ? payload.id : generateId();
+      setWriteState({ writing: true, error: null });
+
+      debugLog("Save entry: start", { entryType, id, uid });
+
+      const dataWithId = { ...payload, id } as Record<string, unknown>;
+
+      let result:
+        | Awaited<ReturnType<typeof writeHealthNote>>
+        | Awaited<ReturnType<typeof writeActionItem>>
+        | Awaited<ReturnType<typeof writeSessionMetadata>>;
+
+      switch (entryType) {
+        case "healthNotes":
+          result = await writeHealthNote(db, uid, dataWithId as HealthNoteCreate & { id: string });
+          break;
+        case "actionItems":
+          result = await writeActionItem(db, uid, dataWithId as ActionItemCreate & { id: string });
+          break;
+        case "sessionMetadata":
+          result = await writeSessionMetadata(db, uid, dataWithId as SessionMetadataCreate & { id: string });
+          break;
+        default:
+          result = { ok: false, error: new Error(`Unknown entry type: ${entryType}`) };
+      }
+
+      if (result.ok) {
+        debugLog("Save entry: success", { entryType, id });
         setWriteState({ writing: false, error: null });
-        setReadState((s) => ({ ...s, data: result.data }));
       } else {
+        debugLog("Save entry: failed", {
+          entryType,
+          id,
+          error: result.error instanceof Error ? result.error.message : String(result.error),
+        });
         setWriteState({ writing: false, error: result.error });
       }
     },
@@ -69,11 +148,7 @@ export function useUserData() {
   );
 
   return {
-    data: readState.data,
-    loading: readState.loading,
-    error: readState.error,
-    refetch,
-    write,
+    save,
     writing: writeState.writing,
     writeError: writeState.error,
     isAuthenticated: !!uid,

@@ -18,8 +18,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { debugLog } from "./logger";
 import { auth } from "./firebase";
+import { debugLog } from "./logger";
 
 type AuthState = {
   user: User | null;
@@ -78,8 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const redirectLoading = useRedirectResult();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      // Only clear loading after first auth state so Firestore never runs before
+      // the SDK has the auth token (avoids "Missing or insufficient permissions").
+      setLoading(false);
+    });
     return unsubscribe;
   }, []);
 
