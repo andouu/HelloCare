@@ -14,4 +14,10 @@ export const formStyles = {
   section:
     "mt-10 w-full max-w-md space-y-6 rounded-2xl border border-zinc-200 bg-zinc-50/50 p-6 dark:border-zinc-700 dark:bg-zinc-900/30",
   error: "text-sm text-red-600 dark:text-red-400",
+    /** Recording button (default state). */
+    buttonRecord:
+    "rounded-full px-6 py-4 text-sm font-medium text-white transition-colors bg-zinc-700 hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:bg-zinc-600 dark:hover:bg-zinc-500",
+  /** Recording button (active recording). */
+  buttonRecordActive:
+    "rounded-full px-6 py-4 text-sm font-medium text-white transition-colors bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:bg-red-700 dark:hover:bg-red-800",
 } as const;

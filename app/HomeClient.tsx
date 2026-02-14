@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useUserMetadata } from "@/lib/firestore";
 import { ProfileForm, AddEntrySection, HomeLayout, HomeHero } from "@/app/components";
@@ -56,6 +57,16 @@ export function HomeClient() {
         />
       )}
       {showAddEntry && <AddEntrySection />}
+
+      {showAddEntry && (
+        <Link
+          href="/appointment"
+          className="mt-8 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Start appointment
+          <span aria-hidden>→</span>
+        </Link>
+      )}
     </HomeLayout>
   );
 }
