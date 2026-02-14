@@ -1,0 +1,61 @@
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
+import { useUserMetadata } from "@/lib/firestore";
+import { ProfileForm, AddEntrySection, HomeLayout, HomeHero } from "@/app/components";
+
+function ProfileLoadingSpinner() {
+  return (
+    <div className="mt-10 flex justify-center">
+      <div
+        className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
+        aria-hidden
+      />
+    </div>
+  );
+}
+
+function getSubtitle(
+  hasUser: boolean,
+  profileLoading: boolean,
+  hasProfile: boolean
+): string {
+  if (!hasUser) return "Sign in to view and update your data.";
+  if (profileLoading) return "Loading your profile…";
+  if (!hasProfile) return "Complete the form below to create your user profile.";
+  return "You're signed in. Add an entry below and save to your Firestore subcollections.";
+}
+
+/**
+ * Home page client: orchestrates auth, profile state, and content.
+ * - Not signed in: hero + sign-in CTA (handled by layout).
+ * - Signed in, no profile: hero + ProfileForm.
+ * - Signed in, has profile: hero + AddEntrySection.
+ */
+export function HomeClient() {
+  const { user } = useAuth();
+  const { data: profileData, loading: profileLoading, saveProfile, error: profileError } =
+    useUserMetadata();
+
+  const hasUser = !!user;
+  const hasProfile = profileData != null;
+  const showProfileForm = hasUser && !profileLoading && !hasProfile;
+  const showAddEntry = hasUser && !profileLoading && hasProfile;
+
+  const subtitle = getSubtitle(hasUser, profileLoading, hasProfile);
+
+  return (
+    <HomeLayout>
+      <HomeHero subtitle={subtitle} />
+      {hasUser && profileLoading && <ProfileLoadingSpinner />}
+      {showProfileForm && (
+        <ProfileForm
+          saveProfile={saveProfile}
+          initialEmail={user?.email ?? ""}
+          error={profileError}
+        />
+      )}
+      {showAddEntry && <AddEntrySection />}
+    </HomeLayout>
+  );
+}

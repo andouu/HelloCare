@@ -1,6 +1,8 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { debugLog } from "./logger";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,13 +17,11 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR) {
-  connectAuthEmulator(auth, process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR);
-}
+const db = getFirestore(app);
 
 function getAnalyticsWhenSupported() {
   if (typeof window === "undefined") return null;
   return isSupported().then((yes) => (yes ? getAnalytics(app) : null));
 }
 
-export { app, auth, getAnalyticsWhenSupported };
+export { app, auth, db, getAnalyticsWhenSupported };

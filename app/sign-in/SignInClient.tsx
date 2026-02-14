@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
+import { debugLog } from "@/lib/logger";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -17,6 +18,7 @@ export function SignInClient() {
   useEffect(() => {
     if (loading || redirectLoading) return;
     if (user) {
+      debugLog("Redirecting to home after sign-in", { uid: user.uid });
       router.replace("/");
     }
   }, [user, loading, redirectLoading, router]);
