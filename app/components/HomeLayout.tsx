@@ -30,6 +30,9 @@ export function HomeLayout({ children }: { children: React.ReactNode }) {
       <header className="absolute right-4 top-4 flex items-center gap-3">
         {user ? (
           <>
+            <Link href="/appointment" className={linkButtonClass}>
+              Appointment
+            </Link>
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               {user.email}
             </span>
