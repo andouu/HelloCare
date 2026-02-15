@@ -52,10 +52,10 @@ function getTimeUntil(appointmentTime: Date): { label: string; pillClass: string
 export const SUGGESTED_PROMPTS = [
   "Summarize my overall health.",
   "What action items do I have?",
+   "What are my upcoming appointments?",
   "What happened in my previous health note?",
   "Summarize my most recent health notes.",
   "What are my most important action items?",
-  "What are my upcoming appointments?",
 ] as const;
 
 function formatDaysUntil(date: Date): string {

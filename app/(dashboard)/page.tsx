@@ -9,7 +9,7 @@ import { useChat } from "@ai-sdk/react";
 import { ChatWidget, HomeSummary, StreamingText } from "@/app/components";
 import { SUGGESTED_PROMPTS } from "@/app/components/HomeSummary";
 import { useDrawer } from "@/app/(dashboard)/layout";
-import { useUserMetadata, useUserData } from "@/lib/firestore";
+import { useAppointments, useUserMetadata, useUserData } from "@/lib/firestore";
 import type { UIMessage } from "ai";
 
 const SCROLL_THRESHOLD = 80;
@@ -24,6 +24,7 @@ function getMessageText(msg: UIMessage): string {
 export default function Home() {
   const { loading, isOnboarded, data: userMetadata } = useUserMetadata();
   const userData = useUserData();
+  const { appointments } = useAppointments();
   const router = useRouter();
   const { openDrawer } = useDrawer() ?? {};
   const { messages, sendMessage, status } = useChat();
@@ -69,8 +70,21 @@ export default function Home() {
         title: s.title,
         summary: s.summary,
       })),
+      appointments: appointments.map((a) => ({
+        id: a.id,
+        appointmentTime:
+          a.appointmentTime instanceof Date ? a.appointmentTime.toISOString() : String(a.appointmentTime),
+        scheduledOn:
+          a.scheduledOn instanceof Date ? a.scheduledOn.toISOString() : String(a.scheduledOn),
+      })),
     }),
-    [userMetadata, userData.healthNotes, userData.actionItems, userData.sessionMetadata]
+    [
+      userMetadata,
+      userData.healthNotes,
+      userData.actionItems,
+      userData.sessionMetadata,
+      appointments,
+    ]
   );
 
   useEffect(() => {

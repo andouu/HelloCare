@@ -3,11 +3,19 @@ import { openai } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
 import type { HealthNote, ActionItem, SessionMetadata, UserMetadata } from "@/lib/firestore/types";
 
+/** Appointment data as sent in chat context (dates as ISO strings). */
+export type ChatContextAppointment = {
+  id: string;
+  appointmentTime: string;
+  scheduledOn: string;
+};
+
 type ChatContext = {
   userMetadata?: UserMetadata | null;
   healthNotes?: HealthNote[];
   actionItems?: ActionItem[];
   sessionMetadata?: SessionMetadata[];
+  appointments?: ChatContextAppointment[];
 };
 
 /** Format date in UTC so calendar dates match (e.g. action item due dates from LLM). */
@@ -21,14 +29,28 @@ function formatDate(d: Date | string): string {
   });
 }
 
+/** Format date and time for appointment display. */
+function formatDateTime(d: Date | string): string {
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
 function buildSystemPrompt(context: ChatContext): string {
   const parts: string[] = [
-    "You are a helpful, empathetic health assistant for HelloCare. You help users understand their health notes, action items, and past visits. Be concise, clear, and supportive. Do not provide medical advice—encourage users to consult their care team for medical decisions.",
+    "You are a helpful, empathetic health assistant for HelloCare. You help users understand their health notes, action items, upcoming appointments, and past visits. Be concise, clear, and supportive. Do not provide medical advice—encourage users to consult their care team for medical decisions.",
     "",
     "## Critical rules",
-    "- Use ONLY the information provided in the context below. Do not invent, assume, or hallucinate any data.",
+    "- Use ONLY the information provided in the context below. Do not invent, assume, or hallucinate any data—including dates, times, appointment details, or any other facts not explicitly listed.",
+    "- Do NOT make up or guess appointment dates, times, or details. Only refer to appointments that appear in the \"Upcoming appointments\" section below. If that section is empty or missing, say you don't have upcoming appointment information.",
     "- If you do not have the information needed to answer a question, say so clearly—e.g. \"I don't have that information,\" \"Not available,\" or \"I don't know.\" It is better to say you don't know than to guess.",
-    "- The \"Past sessions\" section (if present) contains PAST visits/sessions only. Do NOT use it to answer questions about upcoming or future appointments. For questions like \"What are my upcoming appointments?\" or \"When is my next appointment?\" you have no data in this context; respond that you don't have that information and suggest they check the app's schedule or contact their provider.",
+    "- The \"Past sessions\" section (if present) contains PAST visits/sessions only. Do NOT use it to answer questions about upcoming or future appointments. Use only the \"Upcoming appointments\" section for future appointment questions.",
   ];
 
   if (context.userMetadata) {
@@ -62,6 +84,18 @@ function buildSystemPrompt(context: ChatContext): string {
           : "";
         return `- ${a.title || a.description}${med} [status: ${a.status}, due: ${formatDate(a.dueBy)}]`;
       })
+    );
+  }
+
+  if (context.appointments && context.appointments.length > 0) {
+    parts.push(
+      "",
+      "## Upcoming appointments",
+      "The following are the user's scheduled appointments. Use only these when answering questions about upcoming or next appointments. Do not invent any other dates or times.",
+      ...context.appointments.map(
+        (a) =>
+          `- ${formatDateTime(a.appointmentTime)} (scheduled on ${formatDateTime(a.scheduledOn)})`
+      )
     );
   }
 
