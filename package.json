@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.29",
+    "@ai-sdk/react": "^3.0.88",
     "@vapi-ai/server-sdk": "^0.11.0",
     "ai": "^6.0.86",
     "assemblyai": "^4.23.0",
@@ -19,6 +20,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

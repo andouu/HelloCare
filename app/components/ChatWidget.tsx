@@ -14,9 +14,10 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type ChatWidgetProps = {
   onSend?: (content: string) => void;
+  disabled?: boolean;
 };
 
-export function ChatWidget({ onSend }: ChatWidgetProps) {
+export function ChatWidget({ onSend, disabled }: ChatWidgetProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -39,7 +40,7 @@ export function ChatWidget({ onSend }: ChatWidgetProps) {
 
   const handleSend = () => {
     const trimmed = inputValue.trim();
-    if (trimmed && onSend) {
+    if (trimmed && onSend && !disabled) {
       onSend(trimmed);
       setInputValue("");
     }
@@ -47,7 +48,7 @@ export function ChatWidget({ onSend }: ChatWidgetProps) {
 
   return (
     <div
-      className="fixed bottom-10 left-4 right-4 z-30 flex flex-col gap-2 transition-transform duration-200 ease-out md:left-auto md:right-6 md:w-[min(24rem,calc(100vw-3rem))]"
+      className="fixed bottom-0 left-0 right-0 z-30 flex flex-col gap-2 rounded-t-2xl bg-white px-4 pt-4 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1rem))] shadow-[0_-4px_12px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-out md:left-auto md:right-0 md:px-6 md:w-[min(24rem,calc(100vw-3rem))]"
       style={{ transform: `translateY(-${keyboardOffset}px)` }}
     >
       <div className="flex gap-2">
@@ -81,12 +82,14 @@ export function ChatWidget({ onSend }: ChatWidgetProps) {
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           type="text"
           placeholder="Ask any question..."
-          className="min-w-0 flex-1 rounded-full border border-neutral-300 px-4 py-2.5 text-sm"
+          disabled={disabled}
+          className="min-w-0 flex-1 rounded-full border border-neutral-300 bg-white px-4 py-2.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="button"
           onClick={handleSend}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-white transition-colors hover:bg-neutral-700"
+          disabled={disabled}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 disabled:cursor-not-allowed"
           aria-label="Send"
         >
           <HiOutlineArrowUp className="h-4 w-4" strokeWidth={3} />
