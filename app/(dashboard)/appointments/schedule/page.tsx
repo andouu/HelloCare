@@ -84,10 +84,14 @@ const MAX_TIMESLOTS = 3;
 function AwaitingConfirmationState({
   timeslots,
   onToggleAvailability,
+  onProceed,
 }: {
   timeslots: Timeslot[];
   onToggleAvailability: (label: string) => void;
+  onProceed: () => void;
 }) {
+  const hasSelection = timeslots.some((s) => s.available);
+
   return (
     <div className="w-full px-5">
       <div className="flex flex-col items-center">
@@ -112,7 +116,9 @@ function AwaitingConfirmationState({
       </div>
       <button
         type="button"
-        className="w-full h-12 mt-10 rounded-full flex items-center justify-center bg-neutral-900 text-white active:bg-neutral-700"
+        disabled={!hasSelection}
+        onClick={onProceed}
+        className={`w-full h-12 mt-10 rounded-full flex items-center justify-center text-white ${hasSelection ? "bg-neutral-900 active:bg-neutral-700" : "bg-neutral-900/40 cursor-not-allowed"}`}
       >
         Proceed
       </button>
@@ -153,7 +159,7 @@ export default function SchedulePage() {
     const lastName = (result.ok ? result.data?.lastName : "") ?? "";
     const fullName = `${firstName} ${lastName}`.trim();
 
-    console.log("[startVapiCall] Calling", fullName, "at", phoneNumber);
+    console.log("[startVapiCall] Calling");
 
     try {
       const res = await fetch("/api/vapi", {
@@ -172,9 +178,29 @@ export default function SchedulePage() {
   const handleToggleAvailability = (label: string) => {
     setTimeslots((prev) =>
       prev.map((slot) =>
-        slot.label === label ? { ...slot, available: !slot.available } : slot
+        slot.label === label
+          ? { ...slot, available: !slot.available }
+          : { ...slot, available: false }
       )
     );
+  };
+
+  const handleProceed = async () => {
+    const selected = timeslots.find((s) => s.available);
+    if (!selected) return;
+
+    try {
+      await fetch("/api/confirmTimeslot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: selected.label }),
+      });
+      setSchedulingState("completed");
+    } catch (err) {
+      console.error("[handleProceed] Failed to confirm timeslot:", err);
+      setError("Failed to confirm timeslot");
+      setSchedulingState("error");
+    }
   };
 
   return (
@@ -192,6 +218,7 @@ export default function SchedulePage() {
           <AwaitingConfirmationState
             timeslots={timeslots}
             onToggleAvailability={handleToggleAvailability}
+            onProceed={handleProceed}
           />
         ) : (
           <IdleState />

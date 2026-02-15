@@ -2,7 +2,11 @@ import { EventEmitter } from "events";
 
 export type Timeslot = { label: string; available: boolean };
 
-const g = globalThis as unknown as { __tsEmitter?: EventEmitter; __tsData?: Timeslot[] };
+const g = globalThis as unknown as {
+  __tsEmitter?: EventEmitter;
+  __tsData?: Timeslot[];
+  __tsConfirmResolve?: ((label: string) => void) | null;
+};
 if (!g.__tsEmitter) g.__tsEmitter = new EventEmitter();
 if (!g.__tsData) g.__tsData = [];
 
@@ -15,4 +19,25 @@ export function setTimeslots(slots: Timeslot[]) {
 
 export function getTimeslots(): Timeslot[] {
   return g.__tsData ?? [];
+}
+
+/**
+ * Returns a promise that resolves with the confirmed slot label
+ * once `confirmTimeslot` is called.
+ */
+export function waitForConfirmation(): Promise<string> {
+  return new Promise<string>((resolve) => {
+    g.__tsConfirmResolve = resolve;
+  });
+}
+
+/**
+ * Called by the frontend (via API) to confirm the selected timeslot.
+ * Resolves the pending `waitForConfirmation` promise.
+ */
+export function confirmTimeslot(label: string) {
+  if (g.__tsConfirmResolve) {
+    g.__tsConfirmResolve(label);
+    g.__tsConfirmResolve = null;
+  }
 }
