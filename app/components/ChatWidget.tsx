@@ -1,14 +1,16 @@
 'use client';
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { HiMicrophone } from "react-icons/hi";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { HiMicrophone, HiStop } from "react-icons/hi";
 import {
   HiOutlineArrowUp,
   HiOutlineCalendar,
   HiOutlinePencil,
 } from "react-icons/hi2";
 import { RecordHealthNoteModal } from "./RecordHealthNoteModal";
+import { useStreamingTranscription } from "@/app/hooks/useStreamingTranscription";
+import { Spinner } from "./Spinner";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -17,10 +19,101 @@ type ChatWidgetProps = {
   disabled?: boolean;
 };
 
+const WAVEFORM_BARS = 40;
+const BAR_DURATION_MS = 50;
+const MAX_BAR_HEIGHT = 34;
+const MIN_BAR_HEIGHT = 6;
+const NOISE_FLOOR = 0.03;
+
+function RecordingWaveform({ level }: { level: number }) {
+  const levelRef = useRef(level);
+  const barStartRef = useRef(0);
+  const smoothedRef = useRef(MIN_BAR_HEIGHT);
+  const [heights, setHeights] = useState<number[]>(
+    () => Array.from({ length: WAVEFORM_BARS }, () => MIN_BAR_HEIGHT),
+  );
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    levelRef.current = level;
+  }, [level]);
+
+  useEffect(() => {
+    let raf: number;
+    barStartRef.current = performance.now();
+
+    const tick = (now: number) => {
+      const currentLevel = levelRef.current;
+      const targetH =
+        currentLevel < NOISE_FLOOR
+          ? MIN_BAR_HEIGHT
+          : Math.max(MIN_BAR_HEIGHT, Math.pow(currentLevel, 0.65) * MAX_BAR_HEIGHT);
+      smoothedRef.current = smoothedRef.current * 0.6 + targetH * 0.4;
+      const h = smoothedRef.current;
+
+      setHeights((prev) => {
+        const next = [...prev];
+        next[currentIndex] = h;
+        return next;
+      });
+
+      if (now - barStartRef.current >= BAR_DURATION_MS) {
+        barStartRef.current = now;
+        smoothedRef.current = h;
+        setCurrentIndex((i) => (i + 1) % WAVEFORM_BARS);
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [currentIndex]);
+
+  return (
+    <div className="flex h-full w-full items-center justify-center gap-0.5">
+      {Array.from({ length: WAVEFORM_BARS }, (_, displayI) => {
+        const dataIndex = (currentIndex + 1 + displayI) % WAVEFORM_BARS;
+        const h = heights[dataIndex];
+        const isActive = displayI === WAVEFORM_BARS - 1;
+        const isMinHeight = h <= MIN_BAR_HEIGHT;
+        const barColor = isMinHeight
+          ? "bg-neutral-300"
+          : isActive
+            ? "bg-neutral-500"
+            : "bg-neutral-700";
+        return (
+          <div
+            key={displayI}
+            className={`min-w-[1px] flex-1 rounded-sm transition-[height,background-color] duration-75 ease-out ${barColor}`}
+            style={{ height: h, transformOrigin: "center" }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function ChatWidget({ onSend, disabled }: ChatWidgetProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [audioLevel, setAudioLevel] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    startRecording,
+    stopRecording,
+    isRecording,
+    isStarting,
+    isStopping,
+    clearError,
+    clearTranscript,
+    isSupported,
+    tokenStatus,
+  } = useStreamingTranscription({
+    onAudioLevel: useCallback((level: number) => setAudioLevel(level), []),
+  });
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -40,11 +133,41 @@ export function ChatWidget({ onSend, disabled }: ChatWidgetProps) {
 
   const handleSend = () => {
     const trimmed = inputValue.trim();
-    if (trimmed && onSend && !disabled) {
+    if (trimmed && onSend && !disabled && !isRecording && !isStarting && !isStopping) {
       onSend(trimmed);
       setInputValue("");
     }
   };
+
+  const handleMicToggle = useCallback(async () => {
+    if (disabled || isStarting || isStopping) return;
+
+    if (isRecording) {
+      const transcript = (await stopRecording()).trim();
+      if (transcript) {
+        setInputValue(transcript);
+      }
+      inputRef.current?.focus();
+      return;
+    }
+
+    clearError();
+    clearTranscript();
+    setAudioLevel(0);
+    await startRecording();
+  }, [
+    clearError,
+    clearTranscript,
+    disabled,
+    isRecording,
+    isStarting,
+    isStopping,
+    startRecording,
+    stopRecording,
+  ]);
+
+  const canRecord = isSupported && tokenStatus === "ready" && !disabled;
+  const isWaveformMode = isRecording || isStarting || isStopping;
 
   return (
     <div
@@ -71,24 +194,39 @@ export function ChatWidget({ onSend, disabled }: ChatWidgetProps) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300"
-          aria-label="Options"
+          onClick={() => void handleMicToggle()}
+          disabled={!canRecord || isStarting || isStopping}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300 disabled:opacity-60 disabled:cursor-not-allowed"
+          aria-label={isRecording ? "Stop recording" : "Start recording"}
         >
-          <HiMicrophone className="h-5 w-5" />
+          {isStarting || isStopping ? (
+            <Spinner size="sm" />
+          ) : isRecording ? (
+            <HiStop className="h-5 w-5" />
+          ) : (
+            <HiMicrophone className="h-5 w-5" />
+          )}
         </button>
-        <input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          type="text"
-          placeholder="Ask any question..."
-          disabled={disabled}
-          className="min-w-0 flex-1 rounded-full border border-neutral-300 bg-white px-4 py-2.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-        />
+        {isWaveformMode ? (
+          <div className="min-w-0 h-10 flex-1 rounded-full border border-neutral-300 bg-white px-4 py-2.5">
+            <RecordingWaveform level={audioLevel} />
+          </div>
+        ) : (
+          <input
+            ref={inputRef}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            type="text"
+            placeholder="Ask any question..."
+            disabled={disabled}
+            className="min-w-0 flex-1 rounded-full border border-neutral-300 bg-white px-4 py-2.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+        )}
         <button
           type="button"
           onClick={handleSend}
-          disabled={disabled}
+          disabled={disabled || isWaveformMode}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 disabled:cursor-not-allowed"
           aria-label="Send"
         >
