@@ -3,6 +3,9 @@ import { Spinner } from "@/app/components/Spinner";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { HiCheck, HiPhone, HiPhoneMissedCall } from "react-icons/hi";
+import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import { readUserMetadata } from "@/lib/firestore";
 
 type SchedulingStateType = "idle" | "scheduling" | "awaiting_confirmation" | "completed" | "error";
 
@@ -125,11 +128,27 @@ function AwaitingConfirmationState({
 
 export default function SchedulePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [schedulingState, setSchedulingState] = useState<SchedulingStateType>("awaiting_confirmation");
   const [timeslots, setTimeslots] = useState<Timeslot[]>(TEMP_TIMESLOTS);
   /* eslint-disable @typescript-eslint/no-unused-vars -- reserved for future implementation */
   const [error, setError] = useState<string | null>(null);
   /* eslint-enable @typescript-eslint/no-unused-vars */
+
+  async function startVapiCall() {
+    const uid = user?.uid;
+    if (!uid) return;
+
+    const result = await readUserMetadata(db, uid);
+    const phoneNumber = result.ok ? result.data?.hospitalPhoneNumber : undefined;
+    if (!phoneNumber) return;
+
+    await fetch("/api/vapi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phoneNumber }),
+    });
+  }
 
   const handleToggleAvailability = (label: string) => {
     setTimeslots((prev) =>
@@ -162,9 +181,14 @@ export default function SchedulePage() {
       <div className="pb-15 flex flex-col gap-3">
         <button
           onClick={() => {
-            if (schedulingState === "idle") setSchedulingState("scheduling");
-            else if (schedulingState === "completed") setSchedulingState("idle");
-            else setSchedulingState("idle");
+            if (schedulingState === "idle") {
+              setSchedulingState("scheduling");
+              startVapiCall();
+            } else if (schedulingState === "completed") {
+              setSchedulingState("idle");
+            } else {
+              setSchedulingState("idle");
+            }
           }}
           className={`w-full h-12 text-sm text-white rounded-full flex items-center justify-center px-5 gap-2 ${
             schedulingState === "idle"
