@@ -5,3 +5,4 @@
 
 export { Drawer } from "./Drawer";
 export { ChatWidget } from "./ChatWidget";
+export { HomeSummary } from "./HomeSummary";
