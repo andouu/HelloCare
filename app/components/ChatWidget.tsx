@@ -10,9 +10,16 @@ import {
 } from "react-icons/hi2";
 import { RecordHealthNoteModal } from "./RecordHealthNoteModal";
 
-export function ChatWidget() {
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+type ChatWidgetProps = {
+  onSend?: (content: string) => void;
+};
+
+export function ChatWidget({ onSend }: ChatWidgetProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [recordModalOpen, setRecordModalOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -29,6 +36,14 @@ export function ChatWidget() {
       vv.removeEventListener("scroll", update);
     };
   }, []);
+
+  const handleSend = () => {
+    const trimmed = inputValue.trim();
+    if (trimmed && onSend) {
+      onSend(trimmed);
+      setInputValue("");
+    }
+  };
 
   return (
     <div
@@ -61,13 +76,16 @@ export function ChatWidget() {
           <HiMicrophone className="h-5 w-5" />
         </button>
         <input
-          autoFocus
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
           type="text"
           placeholder="Ask any question..."
           className="min-w-0 flex-1 rounded-full border border-neutral-300 px-4 py-2.5 text-sm"
         />
         <button
           type="button"
+          onClick={handleSend}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-white transition-colors hover:bg-neutral-700"
           aria-label="Send"
         >
