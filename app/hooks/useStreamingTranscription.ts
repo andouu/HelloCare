@@ -32,8 +32,13 @@ export type TokenStatus = "loading" | "ready" | "error";
 
 export interface UseStreamingTranscriptionReturn {
   startRecording: () => Promise<void>;
-  stopRecording: () => void;
+  /** Stops recording and returns the final transcript. Waits for AssemblyAI to finalize. */
+  stopRecording: () => Promise<string>;
   isRecording: boolean;
+  /** True while startRecording() is in progress (mic + connection setup). */
+  isStarting: boolean;
+  /** True while stopRecording() is in progress (waiting for AssemblyAI to finalize). */
+  isStopping: boolean;
   segments: Segment[];
   interimTranscript: string;
   error: Error | null;
@@ -69,6 +74,8 @@ export function useStreamingTranscription(
   onAudioLevelRef.current = options?.onAudioLevel;
   // ---- state ---------------------------------------------------------------
   const [isRecording, setIsRecording] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<Error | null>(null);
@@ -91,6 +98,8 @@ export function useStreamingTranscription(
   const segmentIdRef = useRef(0);
   /** Track turn_order values we've already committed as segments to avoid duplicate segments from repeated end_of_turn events. */
   const committedTurnOrdersRef = useRef<Set<number>>(new Set());
+  /** Ref to read final transcript after close() – updated synchronously in turn handler. */
+  const transcriptRef = useRef<{ segments: Segment[]; interim: string }>({ segments: [], interim: "" });
 
   // ---- derived -------------------------------------------------------------
   const isSupported =
@@ -166,11 +175,11 @@ export function useStreamingTranscription(
     }
   }, []);
 
-  /** Close the streaming transcriber connection. */
+  /** Close the streaming transcriber connection. Waits for session termination so final turn events are received. */
   const cleanupTranscriber = useCallback(async () => {
     if (transcriberRef.current) {
       try {
-        await transcriberRef.current.close(false);
+        await transcriberRef.current.close(true);
       } catch {
         /* best-effort */
       }
@@ -180,11 +189,19 @@ export function useStreamingTranscription(
 
   // ---- stopRecording -------------------------------------------------------
 
-  const stopRecording = useCallback(() => {
-    cleanupAudio();
-    void cleanupTranscriber();
-    setIsRecording(false);
-    setInterimTranscript("");
+  const stopRecording = useCallback(async (): Promise<string> => {
+    setIsStopping(true);
+    try {
+      cleanupAudio();
+      await cleanupTranscriber();
+      setIsRecording(false);
+      setInterimTranscript("");
+      const { segments: segs, interim } = transcriptRef.current;
+      const full = [...segs.map((s) => s.text), interim].filter(Boolean).join(" ");
+      return full;
+    } finally {
+      setIsStopping(false);
+    }
   }, [cleanupAudio, cleanupTranscriber]);
 
   // ---- startRecording ------------------------------------------------------
@@ -195,6 +212,7 @@ export function useStreamingTranscription(
       return;
     }
 
+    setIsStarting(true);
     try {
       // 1. Dynamically import the SDK (tree-shakes Node-only code in the
       //    browser and avoids SSR issues).
@@ -219,6 +237,7 @@ export function useStreamingTranscription(
 
       // 4. Create & configure the streaming transcriber (turn detection + keyterms from API/env).
       committedTurnOrdersRef.current.clear();
+      transcriptRef.current = { segments: [], interim: "" };
       const turnDetection = turnDetectionRef.current;
       const keytermsEnabled = keytermsEnabledRef.current;
       debugLog("Key terms are enabled:" + keytermsEnabled);
@@ -263,11 +282,19 @@ export function useStreamingTranscription(
           if (!alreadyCommitted) {
             committedTurnOrdersRef.current.add(turn.turn_order);
             const id = `seg-${++segmentIdRef.current}`;
-            setSegments((prev) => [...prev, { id, text: turn.transcript }]);
+            const seg = { id, text: turn.transcript };
+            setSegments((prev) => [...prev, seg]);
+            transcriptRef.current = {
+              segments: [...transcriptRef.current.segments, seg],
+              interim: "",
+            };
+          } else {
+            transcriptRef.current = { ...transcriptRef.current, interim: "" };
           }
           setInterimTranscript("");
         } else {
           setInterimTranscript(turn.transcript);
+          transcriptRef.current = { ...transcriptRef.current, interim: turn.transcript };
         }
       });
 
@@ -309,6 +336,8 @@ export function useStreamingTranscription(
       setError(
         err instanceof Error ? err : new Error(String(err)),
       );
+    } finally {
+      setIsStarting(false);
     }
   }, [cleanupAudio, cleanupTranscriber]);
 
@@ -319,6 +348,7 @@ export function useStreamingTranscription(
   const clearTranscript = useCallback(() => {
     setSegments([]);
     setInterimTranscript("");
+    transcriptRef.current = { segments: [], interim: "" };
     segmentIdRef.current = 0;
     committedTurnOrdersRef.current.clear();
   }, []);
@@ -339,6 +369,8 @@ export function useStreamingTranscription(
     startRecording,
     stopRecording,
     isRecording,
+    isStarting,
+    isStopping,
     segments,
     interimTranscript,
     error,

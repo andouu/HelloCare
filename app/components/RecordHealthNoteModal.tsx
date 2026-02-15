@@ -4,11 +4,43 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { useStreamingTranscription } from "@/app/hooks/useStreamingTranscription";
+import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import { writeHealthNote } from "@/lib/firestore/api";
 import { Spinner } from "@/app/components/Spinner";
-import { HiMicrophone, HiStop } from "react-icons/hi";
+import { HiMicrophone, HiStop, HiOutlineThumbDown, HiDownload } from "react-icons/hi";
+import type { HealthNote } from "@/lib/firestore/types";
 
 const DISMISS_THRESHOLD = 100;
 const WAVEFORM_BARS = 40;
+
+function formatRelativeDate(date: Date, now: Date = new Date()): string {
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+  const diffWeek = Math.floor(diffDay / 7);
+  const diffMonth = Math.floor(diffDay / 30);
+  const diffYear = Math.floor(diffDay / 365);
+
+  if (diffSec < 60) return "Just now";
+  if (diffMin < 60) return `${diffMin} Minute${diffMin !== 1 ? "s" : ""} Ago`;
+  if (diffHr < 24) return `${diffHr} Hour${diffHr !== 1 ? "s" : ""} Ago`;
+  if (diffDay < 7) return `${diffDay} Day${diffDay !== 1 ? "s" : ""} Ago`;
+  if (diffWeek < 4) return `${diffWeek} Week${diffWeek !== 1 ? "s" : ""} Ago`;
+  if (diffMonth < 12) return `${diffMonth} Month${diffMonth !== 1 ? "s" : ""} Ago`;
+  return `${diffYear} Year${diffYear !== 1 ? "s" : ""} Ago`;
+}
+
+function formatDuration(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  if (sec < 60) return `${sec} Sec`;
+  if (min < 60) return `${min} Min`;
+  return `${hr} Hr ${min % 60} Min`;
+}
 const BAR_DURATION_MS = 50;
 const MAX_BAR_HEIGHT = 68;
 const MIN_BAR_HEIGHT = 8;
@@ -109,17 +141,37 @@ export function RecordHealthNoteModal({
   const draggingRef = useRef(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [screen, setScreen] = useState<"record" | "processing">("record");
+  const [screen, setScreen] = useState<"record" | "processing" | "complete" | "notEnoughData">("record");
+  const [processingPayload, setProcessingPayload] = useState<{
+    transcript: string;
+    startedAt: string;
+    endedAt: string;
+  } | null>(null);
+  const [healthNote, setHealthNote] = useState<HealthNote | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [writeError, setWriteError] = useState<Error | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
+  const { user } = useAuth();
+  const isAuthenticated = !!user?.uid;
+
   useEffect(() => {
-    if (isOpen) setScreen("record");
+    if (isOpen) {
+      setScreen("record");
+      setProcessingPayload(null);
+      setHealthNote(null);
+      setProcessingError(null);
+      setWriteError(null);
+    }
   }, [isOpen]);
 
   const {
     startRecording,
     stopRecording,
     isRecording,
+    isStarting,
+    isStopping,
     segments,
     interimTranscript,
     isSupported,
@@ -151,14 +203,90 @@ export function RecordHealthNoteModal({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleStopRecording = useCallback(() => {
-    const fullTranscript = [...segments.map((s) => s.text), interimTranscript]
-      .filter(Boolean)
-      .join(" ");
+  const handleStopRecording = useCallback(async () => {
+    const startedAt = startTimeRef.current ?? Date.now();
+    const endedAt = Date.now();
+    const fullTranscript = await stopRecording();
     console.log("Transcript:", fullTranscript);
-    stopRecording();
+    setProcessingPayload({
+      transcript: fullTranscript,
+      startedAt: new Date(startedAt).toISOString(),
+      endedAt: new Date(endedAt).toISOString(),
+    });
     setScreen("processing");
-  }, [stopRecording, segments, interimTranscript]);
+  }, [stopRecording]);
+
+  useEffect(() => {
+    if (screen !== "processing" || !processingPayload) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/health-note-from-transcript", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(processingPayload),
+        });
+        if (!res.ok) throw new Error("Failed to generate health note");
+        const data = (await res.json()) as
+          | (HealthNote & { date: string; startedAt: string; endedAt: string })
+          | { notEnoughData: true };
+        if ("notEnoughData" in data && data.notEnoughData) {
+          if (!cancelled) setScreen("notEnoughData");
+          return;
+        }
+        const healthData = data as HealthNote & { date: string; startedAt: string; endedAt: string };
+        const note: HealthNote = {
+          ...healthData,
+          userId: "",
+          date: new Date(healthData.date),
+          startedAt: new Date(healthData.startedAt),
+          endedAt: new Date(healthData.endedAt),
+        };
+        if (!cancelled) {
+          setHealthNote(note);
+          setScreen("complete");
+          console.log("HealthNote (generated):", JSON.stringify(note, null, 2));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setProcessingError(err instanceof Error ? err.message : "Failed to generate health note");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, processingPayload]);
+
+  const handleRetry = useCallback(() => {
+    setScreen("record");
+    setProcessingPayload(null);
+    setHealthNote(null);
+    setProcessingError(null);
+    setWriteError(null);
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!healthNote || !user?.uid) return;
+    setWriting(true);
+    setWriteError(null);
+    const result = await writeHealthNote(db, user.uid, {
+      id: healthNote.id,
+      date: healthNote.date,
+      startedAt: healthNote.startedAt,
+      endedAt: healthNote.endedAt,
+      type: healthNote.type,
+      title: healthNote.title,
+      description: healthNote.description,
+    });
+    setWriting(false);
+    if (result.ok) {
+      onClose();
+    } else {
+      setWriteError(result.error);
+    }
+  }, [healthNote, user?.uid, onClose]);
 
   const onHandleTouchStart = useCallback((e: React.TouchEvent) => {
     draggingRef.current = true;
@@ -227,8 +355,94 @@ export function RecordHealthNoteModal({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <Spinner size="lg" theme="neutral" />
-                    <span className="text-sm text-neutral-500">Processing your recording…</span>
+                    {processingError ? (
+                      <>
+                        <span className="text-sm text-red-600">{processingError}</span>
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          className="text-sm font-medium text-neutral-700 underline"
+                        >
+                          Retry
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Spinner size="lg" theme="neutral" />
+                        <span className="text-sm text-neutral-500">Processing your recording…</span>
+                      </>
+                    )}
+                  </motion.div>
+                ) : screen === "notEnoughData" ? (
+                  <motion.div
+                    key="notEnoughData"
+                    className="flex-1 flex flex-col items-center justify-center gap-4 px-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <span className="font-bold">Not Enough Data</span>
+                    <p className="text text-neutral-500 text-center">
+                      We couldn&apos;t extract enough information from your recording. Try speaking more clearly or for a bit longer about your health concern.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="h-12 mt-8 px-8 font-semibold text-sm rounded-full bg-neutral-900 text-white hover:bg-neutral-800 active:bg-neutral-700 flex items-center justify-center gap-2"
+                    >
+                      Retry recording
+                    </button>
+                  </motion.div>
+                ) : screen === "complete" && healthNote ? (
+                  <motion.div
+                    key="complete"
+                    className="flex flex-col h-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <div className="flex-1 overflow-auto flex flex-col items-center text-center py-4 px-2">
+                      <div className="flex flex-col gap-4 max-w-md">
+                        <div className="flex flex-row items-center justify-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200 text-neutral-700">
+                            {healthNote.type}
+                          </span>
+                          <h3 className="text-lg font-bold text-neutral-900">{healthNote.title}</h3>
+                        </div>
+                        <div className="text-sm text-neutral-500">
+                          {formatRelativeDate(healthNote.startedAt)}
+                          {healthNote.startedAt.getTime() !== healthNote.endedAt.getTime() && (
+                            <> · {formatDuration(healthNote.endedAt.getTime() - healthNote.startedAt.getTime())} Recording</>
+                          )}
+                        </div>
+                        <p className="text text-neutral-600 whitespace-pre-wrap">{healthNote.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-auto pt-4">
+                      <button
+                        type="button"
+                        onClick={handleRetry}
+                        disabled={writing}
+                        className="flex-1 h-12 font-semibold text-sm rounded-full border border-neutral-300 text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <HiOutlineThumbDown size={18} />
+                        Retry recording
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={!isAuthenticated || writing}
+                        className="flex-1 h-12 font-semibold text-sm rounded-full bg-neutral-900 text-white hover:bg-neutral-800 active:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {writing ? <Spinner size="sm" theme="amber" /> : <HiDownload size={18} />}
+                        Save note
+                      </button>
+                    </div>
+                    {writeError && (
+                      <p className="text-sm text-red-600 mt-2" role="alert">{writeError.message}</p>
+                    )}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -239,41 +453,42 @@ export function RecordHealthNoteModal({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25 }}
                   >
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="font-bold">Record Health Note</span>
-                    <span className="text-neutral-400">
-                      Record health incidents you&apos;re experiencing, and we&apos;ll use this information to help you.
-                    </span>
-                  </div>
-                  <div className="flex-1 flex flex-col items-center justify-center py-8 gap-3">
-                    {isRecording ? (
-                      <>
-                        <RecordingWaveform level={audioLevel} />
-                        <span className="text-sm font-semibold tabular-nums text-neutral-700 mt-5">
-                          {formatTime(elapsedSeconds)}
-                        </span>
-                      </>
-                    ) : (
-                      <IdleWaveform />
-                    )}
-                  </div>
-                  <div className="mt-auto">
-                    <button
-                      type="button"
-                      onClick={isRecording ? handleStopRecording : () => void startRecording()}
-                      disabled={!canRecord}
-                      className={`w-full h-12 font-semibold text-sm rounded-full flex items-center justify-center gap-2 px-5 disabled:opacity-50 disabled:cursor-not-allowed ${
-                        isRecording
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="font-bold">Record Health Note</span>
+                      <span className="text-neutral-400">
+                        Record health incidents you&apos;re experiencing, and we&apos;ll use this information to help you.
+                      </span>
+                    </div>
+                    <div className="flex-1 flex flex-col items-center justify-center py-8 gap-3">
+                      {isRecording ? (
+                        <>
+                          <RecordingWaveform level={audioLevel} />
+                          <span className="text-sm font-semibold tabular-nums text-neutral-700 mt-5">
+                            {formatTime(elapsedSeconds)}
+                          </span>
+                        </>
+                      ) : (
+                        <IdleWaveform />
+                      )}
+                    </div>
+                    <div className="mt-auto">
+                      <button
+                        type="button"
+                        onClick={isRecording ? handleStopRecording : () => void startRecording()}
+                        disabled={!canRecord || isStarting || isStopping}
+                        className={`w-full h-12 font-semibold text-sm rounded-full flex items-center justify-center gap-2 px-5 disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
                           ? "bg-red-500 text-white active:bg-red-400"
                           : "bg-neutral-900 text-white active:bg-neutral-700"
-                      }`}
-                      aria-pressed={isRecording}
-                      aria-label={isRecording ? "Stop recording" : "Start recording"}
-                    >
-                      {isRecording ? <HiStop size={20} /> : <HiMicrophone size={20} />}
-                      <span className="flex-1 text-center">{isRecording ? "Stop Recording" : "Start Recording"}</span>
-                    </button>
-                  </div>
+                          }`}
+                        aria-pressed={isRecording}
+                        aria-label={isRecording ? (isStopping ? "Stopping…" : "Stop recording") : isStarting ? "Starting…" : "Start recording"}
+                      >
+                        {isRecording ? <HiStop size={20} /> : <HiMicrophone size={20} />}
+                        <span className="flex-1 text-center flex items-center justify-center gap-2">
+                          {isStarting || isStopping ? <Spinner size="sm" theme="amber" /> : isRecording ? "Stop Recording" : "Start Recording"}
+                        </span>
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
