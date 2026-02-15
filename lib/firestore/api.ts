@@ -6,6 +6,7 @@
 
 import {
   collection,
+  deleteDoc as firestoreDeleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -178,6 +179,40 @@ export async function writeSessionMetadata(
     documentIds: data.documentIds ?? [],
   };
   return writeUserSubcollectionDoc(db, uid, "sessionMetadata", docData);
+}
+
+/**
+ * Deletes a document from a user subcollection. Path: users/{uid}/{subcollection}/{docId}.
+ */
+async function deleteUserSubcollectionDoc(
+  db: Firestore,
+  uid: string,
+  subcollection: UserSubcollectionKey,
+  docId: string
+): Promise<FirestoreResult<void>> {
+  try {
+    const ref = doc(db, ...userSubcollectionDocRefSegments(uid, subcollection, docId));
+    await firestoreDeleteDoc(ref);
+    return { ok: true, data: undefined };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err : new Error(String(err)) };
+  }
+}
+
+export async function deleteHealthNote(
+  db: Firestore,
+  uid: string,
+  noteId: string
+): Promise<FirestoreResult<void>> {
+  return deleteUserSubcollectionDoc(db, uid, "healthNotes", noteId);
+}
+
+export async function deleteActionItem(
+  db: Firestore,
+  uid: string,
+  itemId: string
+): Promise<FirestoreResult<void>> {
+  return deleteUserSubcollectionDoc(db, uid, "actionItems", itemId);
 }
 
 function snapshotToHealthNote(snap: DocumentSnapshot): HealthNote | null {

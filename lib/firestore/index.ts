@@ -29,6 +29,8 @@ export { sortHealthNotesByCreatedDesc } from "./healthNotes";
 export { toFirestoreValue } from "./serialize";
 export {
   readUserMetadata,
+  deleteActionItem,
+  deleteHealthNote,
   writeActionItem,
   writeHealthNote,
   writeSessionMetadata,

@@ -1,9 +1,13 @@
 "use client";
 
-import { HiOutlineMenuAlt4 } from "react-icons/hi";
+import { useCallback, useState } from "react";
+import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
 import { Spinner } from "@/app/components/Spinner";
+import { Toast } from "@/app/components/Toast";
 import { useDrawer } from "@/app/(dashboard)/layout";
-import { useHealthNotes } from "@/lib/firestore";
+import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import { deleteHealthNote, useHealthNotes } from "@/lib/firestore";
 import type { HealthNote } from "@/lib/firestore";
 
 function formatDate(date: Date): string {
@@ -16,13 +20,27 @@ function formatTime(date: Date): string {
   }).format(date);
 }
 
-function HealthNoteCard({ note }: { note: HealthNote }) {
+function HealthNoteCard({
+  note,
+  onDelete,
+}: {
+  note: HealthNote;
+  onDelete: (id: string) => void;
+}) {
   return (
     <article
-      className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      className="relative rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
       data-health-note-id={note.id}
     >
-      <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => onDelete(note.id)}
+        className="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+        aria-label={`Delete ${note.title || "health note"}`}
+      >
+        <HiOutlineTrash className="w-4 h-4" />
+      </button>
+      <div className="flex flex-col gap-2 pr-8">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold text-neutral-900">
             {note.title || "Untitled"}
@@ -71,9 +89,26 @@ function ErrorState({ message }: { message: string }) {
 export default function HealthNotesPage() {
   const { healthNotes, loading, error } = useHealthNotes();
   const { openDrawer } = useDrawer() ?? {};
+  const { user } = useAuth();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDeletedToast, setShowDeletedToast] = useState(false);
+
+  const handleDelete = async (noteId: string) => {
+    if (!user?.uid) return;
+    setDeleteError(null);
+    const result = await deleteHealthNote(db, user.uid, noteId);
+    if (result.ok) {
+      setShowDeletedToast(true);
+    } else {
+      setDeleteError(result.error.message);
+    }
+  };
+
+  const dismissToast = useCallback(() => setShowDeletedToast(false), []);
 
   return (
     <div className="w-full min-h-screen flex flex-col">
+      <Toast message="Deleted" visible={showDeletedToast} onDismiss={dismissToast} />
       <header className="flex items-center justify-between px-4 py-3">
         <button
           type="button"
@@ -91,6 +126,12 @@ export default function HealthNotesPage() {
         Your health notes from visits, updated in real time.
       </p>
 
+      {deleteError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-center">
+          <p className="text-sm text-rose-800">{deleteError}</p>
+        </div>
+      )}
+
       {loading && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
           <Spinner size="lg" theme="neutral" />
@@ -106,7 +147,7 @@ export default function HealthNotesPage() {
         <ul className="flex flex-col gap-3 list-none p-0 m-0">
           {healthNotes.map((note) => (
             <li key={note.id}>
-              <HealthNoteCard note={note} />
+              <HealthNoteCard note={note} onDelete={handleDelete} />
             </li>
           ))}
         </ul>

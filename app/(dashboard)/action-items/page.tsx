@@ -1,9 +1,13 @@
 "use client";
 
-import { HiOutlineMenuAlt4 } from "react-icons/hi";
+import { useCallback, useState } from "react";
+import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
 import { Spinner } from "@/app/components/Spinner";
+import { Toast } from "@/app/components/Toast";
 import { useDrawer } from "@/app/(dashboard)/layout";
-import { sortActionItemsByPriorityAndDueDate, useActionItems } from "@/lib/firestore";
+import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import { deleteActionItem, sortActionItemsByPriorityAndDueDate, useActionItems } from "@/lib/firestore";
 import type { ActionItem } from "@/lib/firestore";
 
 /** Format due date in UTC so calendar date matches stored value (LLM sends date-only as midnight UTC). */
@@ -15,15 +19,29 @@ function formatDueDate(date: Date): string {
   }).format(date);
 }
 
-function ActionItemCard({ item }: { item: ActionItem }) {
+function ActionItemCard({
+  item,
+  onDelete,
+}: {
+  item: ActionItem;
+  onDelete: (id: string) => void;
+}) {
   const hasMedication = item.medication != null;
 
   return (
     <article
-      className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      className="relative rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
       data-action-item-id={item.id}
     >
-      <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => onDelete(item.id)}
+        className="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+        aria-label={`Delete ${item.title || "action item"}`}
+      >
+        <HiOutlineTrash className="w-4 h-4" />
+      </button>
+      <div className="flex flex-col gap-2 pr-8">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold text-neutral-900">
             {item.title || "Untitled"}
@@ -97,9 +115,26 @@ function ErrorState({ message }: { message: string }) {
 export default function ActionItemsPage() {
   const { actionItems, loading, error } = useActionItems();
   const { openDrawer } = useDrawer() ?? {};
+  const { user } = useAuth();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDeletedToast, setShowDeletedToast] = useState(false);
+
+  const handleDelete = async (itemId: string) => {
+    if (!user?.uid) return;
+    setDeleteError(null);
+    const result = await deleteActionItem(db, user.uid, itemId);
+    if (result.ok) {
+      setShowDeletedToast(true);
+    } else {
+      setDeleteError(result.error.message);
+    }
+  };
+
+  const dismissToast = useCallback(() => setShowDeletedToast(false), []);
 
   return (
     <div className="w-full min-h-screen flex flex-col">
+      <Toast message="Deleted" visible={showDeletedToast} onDismiss={dismissToast} />
       <header className="flex items-center justify-between px-4 py-3">
         <button
           type="button"
@@ -119,6 +154,12 @@ export default function ActionItemsPage() {
         </p>
       </div>
 
+      {deleteError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-center">
+          <p className="text-sm text-rose-800">{deleteError}</p>
+        </div>
+      )}
+
       {loading && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
           <Spinner size="lg" theme="neutral" />
@@ -134,7 +175,7 @@ export default function ActionItemsPage() {
         <ul className="flex flex-col gap-3 list-none p-0 m-0">
           {sortActionItemsByPriorityAndDueDate(actionItems).map((item) => (
             <li key={item.id}>
-              <ActionItemCard item={item} />
+              <ActionItemCard item={item} onDelete={handleDelete} />
             </li>
           ))}
         </ul>

@@ -8,3 +8,4 @@ export { ChatWidget } from "./ChatWidget";
 export { HomeSummary } from "./HomeSummary";
 export { MarkdownContent } from "./MarkdownContent";
 export { StreamingText } from "./StreamingText";
+export { Toast } from "./Toast";

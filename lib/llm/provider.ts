@@ -54,7 +54,6 @@ export async function createModel(
       try {
         // Optional peer dependency — only required when LLM_PROVIDER=anthropic.
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error — @ai-sdk/anthropic is an optional dependency
         const { anthropic } = await import("@ai-sdk/anthropic");
         return anthropic(modelId);
       } catch {
