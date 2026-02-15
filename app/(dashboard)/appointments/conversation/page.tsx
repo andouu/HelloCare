@@ -170,7 +170,7 @@ export default function ConversationPage() {
           {t("conversation.subtitle", { date: dateLabel })}
         </p>
         <div
-          className={`flex-1 min-h-0 flex flex-col rounded-2xl border px-4 transition-colors overflow-hidden ${VIEW_CARD_CLASS[view as keyof typeof VIEW_CARD_CLASS]}`}
+          className={`flex-1 min-h-0 flex flex-col rounded-2xl px-4 transition-colors overflow-hidden ${VIEW_CARD_CLASS[view as keyof typeof VIEW_CARD_CLASS]}`}
         >
           {renderView()}
         </div>

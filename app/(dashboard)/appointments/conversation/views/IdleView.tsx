@@ -11,7 +11,7 @@ export function IdleView({ onStartRecording, canRecord, isStarting }: Props) {
   const { t } = useI18n();
 
   return (
-    <div className="flex flex-col gap-3 items-center justify-center flex-1">
+    <div className="flex flex-col gap-3 items-center justify-center flex-1 bg-neutral-100">
       <div className="min-h-[2rem] w-full max-w-md text-center text-sm text-neutral-700">
         {"\u00A0"}
       </div>
@@ -21,15 +21,15 @@ export function IdleView({ onStartRecording, canRecord, isStarting }: Props) {
         disabled={!canRecord || isStarting}
         aria-label={isStarting ? t("chatWidget.startRecording") : t("chatWidget.startRecording")}
         aria-pressed={false}
-        className="w-20 h-20 rounded-full border-2 border-neutral-900 bg-white text-neutral-900 flex items-center justify-center shrink-0 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed active:opacity-80"
+        className="w-20 h-20 rounded-full bg-neutral-900 text-white flex items-center justify-center shrink-0 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed active:opacity-80"
       >
         {isStarting ? (
-          <Spinner size="md" theme="neutral" />
+          <Spinner size="md" theme="amber" />
         ) : (
-          <HiMicrophone className="w-8 h-8" aria-hidden />
+          <HiMicrophone className="w-6 h-6" aria-hidden />
         )}
       </button>
-      <span className="text-center text-base text-neutral-900">
+      <span className="text-center text-base text-neutral-400">
         {t("conversation.idle.cta")}
       </span>
     </div>

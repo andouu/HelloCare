@@ -22,11 +22,11 @@ type CardViewId = Exclude<ConversationViewId, typeof FULL_PAGE_VIEWS extends Rea
 
 /** Card wrapper class for each card-wrapped view (layout + theme). */
 export const VIEW_CARD_CLASS: Record<CardViewId, string> = {
-  idle: "bg-white border-neutral-200",
-  recording: "bg-blue-500 border-blue-600 text-white",
-  summary: "bg-white border-blue-500 py-5",
-  retry: "bg-white border-neutral-200",
-  confirmed: "bg-white border-neutral-200",
+  idle: "bg-neutral-100",
+  recording: "bg-blue-500 text-white",
+  summary: "bg-neutral-100 py-5",
+  retry: "bg-neutral-100",
+  confirmed: "bg-neutral-100",
 };
 
 /** Registry of view id -> component. Add new views here. */

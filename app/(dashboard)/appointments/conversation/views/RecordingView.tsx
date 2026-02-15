@@ -26,7 +26,7 @@ export function RecordingView({
         disabled={!canRecord || isStopping}
         aria-label={isStopping ? t("chatWidget.stopRecording") : t("chatWidget.stopRecording")}
         aria-pressed
-        className="w-20 h-20 rounded-full border-2 border-red-500 bg-red-500 text-white flex items-center justify-center shrink-0 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed active:opacity-80"
+        className="w-25 h-25 rounded-full bg-blue-400 text-white flex items-center justify-center shrink-0 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed active:opacity-80"
       >
         {isStopping ? (
           <Spinner size="md" theme="amber" />
@@ -34,7 +34,7 @@ export function RecordingView({
           <HiStop className="w-8 h-8" aria-hidden />
         )}
       </button>
-      <span className="text-center text-base text-white">{t("conversation.recording.status")}</span>
+      <span className="text-center text-base text-blue-300">{t("conversation.recording.status")}</span>
     </div>
   );
 }
