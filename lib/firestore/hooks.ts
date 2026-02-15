@@ -10,14 +10,21 @@ import {
   writeHealthNote,
   writeActionItem,
   writeSessionMetadata,
+  subscribeHealthNotes,
+  subscribeActionItems,
+  subscribeSessionMetadata,
 } from "./api";
-import type { UserMetadata, UserMetadataUpdatePayload } from "./types";
 import type {
+  ActionItem,
+  HealthNote,
+  SessionMetadata,
+  UserMetadata,
+  UserMetadataUpdatePayload,
   HealthNoteCreate,
   ActionItemCreate,
   SessionMetadataCreate,
+  EntryType,
 } from "./types";
-import type { EntryType } from "./types";
 
 type UserMetadataState = {
   data: UserMetadata | null;
@@ -179,4 +186,69 @@ export function useSaveEntry() {
     writeError: writeState.error,
     isAuthenticated: !!uid,
   };
+}
+
+type UserDataState = {
+  healthNotes: HealthNote[];
+  actionItems: ActionItem[];
+  sessionMetadata: SessionMetadata[];
+  loading: boolean;
+  error: Error | null;
+};
+
+/**
+ * Hook that subscribes in real-time to the authenticated user's subcollections
+ * (healthNotes, actionItems, sessionMetadata) via onSnapshot.
+ * Only subscribes after auth has finished loading so the Firestore SDK has a valid token.
+ */
+export function useUserData() {
+  const { user, loading: authLoading } = useAuth();
+  const uid = user?.uid ?? null;
+
+  const [state, setState] = useState<UserDataState>({
+    healthNotes: [],
+    actionItems: [],
+    sessionMetadata: [],
+    loading: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (authLoading || !uid) return;
+    setState((s) => ({ ...s, loading: true, error: null }));
+
+    const received = { current: 0 };
+    const markReceived = () => {
+      received.current += 1;
+      if (received.current === 3) {
+        setState((s) => ({ ...s, loading: false }));
+      }
+    };
+
+    const onError = (err: Error) =>
+      setState((s) => ({ ...s, error: s.error ?? err }));
+
+    const unsubHn = subscribeHealthNotes(db, uid, (data) => {
+      setState((s) => ({ ...s, healthNotes: data }));
+      markReceived();
+    }, onError);
+
+    const unsubAi = subscribeActionItems(db, uid, (data) => {
+      setState((s) => ({ ...s, actionItems: data }));
+      markReceived();
+    }, onError);
+
+    const unsubSm = subscribeSessionMetadata(db, uid, (data) => {
+      setState((s) => ({ ...s, sessionMetadata: data }));
+      markReceived();
+    }, onError);
+
+    return () => {
+      unsubHn();
+      unsubAi();
+      unsubSm();
+    };
+  }, [authLoading, uid]);
+
+  return state;
 }

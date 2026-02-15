@@ -43,7 +43,7 @@ export function HomeLayout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-center px-6 py-24 sm:items-start">
+      <main className="flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-6 py-24 sm:items-start">
         {children}
       </main>
     </div>
