@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HiMicrophone, HiStop } from "react-icons/hi";
+import { HiChatAlt2, HiMicrophone, HiStop } from "react-icons/hi";
 import {
   HiArrowRight,
   HiOutlineArrowUp,
@@ -190,6 +190,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
           disabled={disabled}
           className={SUGGESTED_PROMPT_BUTTON_CLASS}
         >
+          <HiChatAlt2 className="h-5 w-5 shrink-0 text-neutral-900" aria-hidden />
           <span className="min-w-0 flex-1 truncate">{suggestedPrompt}</span>
           <HiArrowRight className="h-4 w-4 shrink-0 text-neutral-400" />
         </button>
