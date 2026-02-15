@@ -176,6 +176,7 @@ export function useSaveEntry() {
         });
         setWriteState({ writing: false, error: result.error });
       }
+      return result;
     },
     [uid],
   );
