@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TbArrowBackUp, TbUpload, TbLoader2, TbCheck, TbAlertTriangle } from "react-icons/tb";
 import { useSaveEntry } from "@/lib/firestore/hooks";
+import { sortActionItemsByPriorityAndDueDate } from "@/lib/firestore";
 import type { ActionItemCreate, ActionItemSerialized } from "@/lib/firestore/types";
 import type { ConversationViewPropsMap } from "../types";
 
@@ -259,7 +260,7 @@ export function VisitSummaryView({
 
   const renderActionItems = () => {
     if (state.status !== "success") return null;
-    const items = state.actionItems;
+    const items = sortActionItemsByPriorityAndDueDate(state.actionItems);
     return items.length === 0 ? (
       <p className="text-sm text-neutral-500">
         No action items were identified.

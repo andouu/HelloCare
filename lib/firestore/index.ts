@@ -24,6 +24,7 @@ export type {
   UserMetadata,
   UserMetadataUpdatePayload,
 } from "./types";
+export { sortActionItemsByPriorityAndDueDate } from "./actionItems";
 export { toFirestoreValue } from "./serialize";
 export {
   readUserMetadata,

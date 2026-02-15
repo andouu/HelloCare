@@ -3,7 +3,7 @@
 import { HiOutlineMenuAlt4 } from "react-icons/hi";
 import { Spinner } from "@/app/components/Spinner";
 import { useDrawer } from "@/app/(dashboard)/layout";
-import { useActionItems } from "@/lib/firestore";
+import { sortActionItemsByPriorityAndDueDate, useActionItems } from "@/lib/firestore";
 import type { ActionItem } from "@/lib/firestore";
 
 function formatDueDate(date: Date): string {
@@ -130,7 +130,7 @@ export default function ActionItemsPage() {
 
       {!loading && !error && actionItems.length > 0 && (
         <ul className="flex flex-col gap-3 list-none p-0 m-0">
-          {actionItems.map((item) => (
+          {sortActionItemsByPriorityAndDueDate(actionItems).map((item) => (
             <li key={item.id}>
               <ActionItemCard item={item} />
             </li>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { HiOutlineChevronRight } from "react-icons/hi2";
-import { useUserMetadata, useUserData } from "@/lib/firestore";
+import { sortActionItemsByPriorityAndDueDate, useUserMetadata, useUserData } from "@/lib/firestore";
 import type { ActionItem, SessionMetadata } from "@/lib/firestore";
 import { HiArrowRight } from "react-icons/hi";
 
@@ -40,10 +40,8 @@ function getSummaryCards(
     }
   }
 
-  // Up to 3 recent action items (soonest due first)
-  const sortedActionItems = [...actionItems].sort(
-    (a, b) => new Date(a.dueBy).getTime() - new Date(b.dueBy).getTime()
-  );
+  // Up to 3 recent action items (by priority then soonest due first)
+  const sortedActionItems = sortActionItemsByPriorityAndDueDate(actionItems);
   const remaining = 3 - cards.length;
   for (let i = 0; i < Math.min(remaining, sortedActionItems.length); i++) {
     const item = sortedActionItems[i];
