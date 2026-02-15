@@ -23,7 +23,12 @@ function formatDate(d: Date | string): string {
 
 function buildSystemPrompt(context: ChatContext): string {
   const parts: string[] = [
-    "You are a helpful, empathetic health assistant for HelloCare. You help users understand their health notes, action items, and appointments. Be concise, clear, and supportive. Do not provide medical advice—encourage users to consult their care team for medical decisions.",
+    "You are a helpful, empathetic health assistant for HelloCare. You help users understand their health notes, action items, and past visits. Be concise, clear, and supportive. Do not provide medical advice—encourage users to consult their care team for medical decisions.",
+    "",
+    "## Critical rules",
+    "- Use ONLY the information provided in the context below. Do not invent, assume, or hallucinate any data.",
+    "- If you do not have the information needed to answer a question, say so clearly—e.g. \"I don't have that information,\" \"Not available,\" or \"I don't know.\" It is better to say you don't know than to guess.",
+    "- The \"Past sessions\" section (if present) contains PAST visits/sessions only. Do NOT use it to answer questions about upcoming or future appointments. For questions like \"What are my upcoming appointments?\" or \"When is my next appointment?\" you have no data in this context; respond that you don't have that information and suggest they check the app's schedule or contact their provider.",
   ];
 
   if (context.userMetadata) {
@@ -63,7 +68,8 @@ function buildSystemPrompt(context: ChatContext): string {
   if (context.sessionMetadata && context.sessionMetadata.length > 0) {
     parts.push(
       "",
-      "## Appointments / sessions",
+      "## Past sessions only (NOT upcoming appointments)",
+      "The following are past visits/sessions. Do NOT use this list for questions about upcoming or future appointments.",
       ...context.sessionMetadata.map(
         (s) =>
           `- [${formatDate(s.date)}] ${s.title}: ${s.summary || "(no summary)"}`
