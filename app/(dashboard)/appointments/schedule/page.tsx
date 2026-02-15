@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import { readUserMetadata } from "@/lib/firestore";
 
-type SchedulingStateType = "idle" | "scheduling" | "awaiting_confirmation" | "completed" | "error";
+type SchedulingStateType = "idle" | "scheduling" | "awaiting_confirmation" | "no_availability" | "completed" | "error";
 
 type StateTheme = "neutral" | "amber" | "blue" | "emerald" | "rose";
 
@@ -31,6 +31,11 @@ const STATE_STYLES: Record<
     bg: "bg-blue-500",
     text: "text-white",
     theme: "blue",
+  },
+  no_availability: {
+    bg: "bg-neutral-500",
+    text: "text-white",
+    theme: "neutral",
   },
   completed: {
     bg: "bg-emerald-400",
@@ -152,8 +157,9 @@ export default function SchedulePage() {
 
     const es = new EventSource("/api/timeslots/stream");
     es.onmessage = (e) => {
-      setTimeslots(JSON.parse(e.data));
-      setSchedulingState("awaiting_confirmation");
+      const slots: Timeslot[] = JSON.parse(e.data);
+      setTimeslots(slots);
+      setSchedulingState(slots.length > 0 ? "awaiting_confirmation" : "no_availability");
     };
     return () => es.close();
   }, [schedulingState]);
@@ -232,6 +238,8 @@ export default function SchedulePage() {
             subtitle={t("schedule.slotsSubtitle")}
             proceedLabel={t("schedule.proceed")}
           />
+        ) : schedulingState === "no_availability" ? (
+          <NoAvailabilityState />
         ) : (
           <IdleState text={t("schedule.idle")} />
         )}
@@ -239,26 +247,26 @@ export default function SchedulePage() {
       <div className="pb-15 flex flex-col gap-3">
         <button
           onClick={() => {
-            if (schedulingState === "idle") {
+            if (schedulingState === "idle" || schedulingState === "completed" || schedulingState === "no_availability") {
               setSchedulingState("scheduling");
               startVapiCall();
-            } else if (schedulingState === "completed") {
-              setSchedulingState("idle");
             } else {
               setSchedulingState("idle");
             }
           }}
           className={`w-full h-12 text-sm text-white rounded-full flex items-center justify-center px-5 gap-2 ${
-            schedulingState === "idle"
+            schedulingState === "idle" || schedulingState === "completed" || schedulingState === "no_availability"
               ? "bg-neutral-900 active:bg-neutral-700"
               : "bg-red-500 active:bg-red-400"
           }`}
         >
-          {schedulingState === "idle" ? <HiPhone className="w-4 h-4" /> : <HiPhoneMissedCall className="w-4 h-4" />}
+          {schedulingState === "idle" || schedulingState === "completed" || schedulingState === "no_availability"
+            ? <HiPhone className="w-4 h-4" />
+            : <HiPhoneMissedCall className="w-4 h-4" />}
           <span className="flex-1">
             {schedulingState === "idle"
               ? t("schedule.start")
-              : schedulingState === "completed"
+              : schedulingState === "completed" || schedulingState === "no_availability"
                 ? t("schedule.startAgain")
                 : t("schedule.stop")}
           </span>

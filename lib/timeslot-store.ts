@@ -23,11 +23,19 @@ export function getTimeslots(): Timeslot[] {
 
 /**
  * Returns a promise that resolves with the confirmed slot label
- * once `confirmTimeslot` is called.
+ * once `confirmTimeslot` is called, or rejects if `timeoutMs` elapses first.
  */
-export function waitForConfirmation(): Promise<string> {
-  return new Promise<string>((resolve) => {
-    g.__tsConfirmResolve = resolve;
+export function waitForConfirmation(timeoutMs: number): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      g.__tsConfirmResolve = null;
+      reject(new Error("Confirmation timed out"));
+    }, timeoutMs);
+
+    g.__tsConfirmResolve = (label: string) => {
+      clearTimeout(timer);
+      resolve(label);
+    };
   });
 }
 
