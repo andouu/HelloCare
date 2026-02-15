@@ -16,6 +16,7 @@ export type {
   ActionItemCreate,
   Appointment,
   AppointmentCreate,
+  Document,
   EntryType,
   FirestoreResult,
   HealthNote,
@@ -38,13 +39,15 @@ export {
   deleteHealthNote,
   deleteSessionMetadata,
   readAppointments,
+  readDocuments,
   writeActionItem,
   writeAppointment,
+  writeDocument,
   writeHealthNote,
   writeSessionMetadata,
   writeUserMetadata,
 } from "./api";
-export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useAppointments, useHealthNotes, useSessionMetadata } from "./hooks";
+export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useAppointments, useDocuments, useHealthNotes, useSessionMetadata } from "./hooks";
 export {
   ENTRY_FORM_CONFIGS,
   ENTRY_TYPES,

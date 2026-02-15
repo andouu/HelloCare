@@ -28,6 +28,7 @@ import { DEFAULT_LANGUAGE_TAG, resolveLanguageTag } from "@/lib/i18n/locales";
 import type {
   ActionItem,
   Appointment,
+  Document as DocumentType,
   HealthNote,
   SessionMetadata,
   UserMetadata,
@@ -195,6 +196,15 @@ export async function writeAppointment(
   return writeUserSubcollectionDoc(db, uid, "appointments", docData);
 }
 
+export async function writeDocument(
+  db: Firestore,
+  uid: string,
+  data: Omit<DocumentType, "userId"> & { userId?: string }
+): Promise<FirestoreResult<DocumentType>> {
+  const docData: DocumentType = { ...data, userId: uid };
+  return writeUserSubcollectionDoc(db, uid, "documents", docData);
+}
+
 /**
  * Deletes a document from a user subcollection. Path: users/{uid}/{subcollection}/{docId}.
  */
@@ -327,6 +337,17 @@ function snapshotToAppointment(snap: DocumentSnapshot): Appointment | null {
   };
 }
 
+function snapshotToDocument(snap: DocumentSnapshot): DocumentType | null {
+  const data = snap.data();
+  if (!data || typeof data.userId !== "string") return null;
+  return {
+    id: snap.id,
+    userId: data.userId,
+    summary: typeof data.summary === "string" ? data.summary : "",
+    uploadedAt: toDate(data.uploadedAt),
+  };
+}
+
 
 /**
  * Subscribes to a user subcollection with onSnapshot. Calls onData with parsed items
@@ -405,6 +426,19 @@ export function subscribeAppointments(
   return subscribeUserSubcollection(db, uid, "appointments", snapshotToAppointment, onData, onError);
 }
 
+/**
+ * Real-time subscription to documents for the given user.
+ * Returns an unsubscribe function.
+ */
+export function subscribeDocuments(
+  db: Firestore,
+  uid: string,
+  onData: (data: DocumentType[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  return subscribeUserSubcollection(db, uid, "documents", snapshotToDocument, onData, onError);
+}
+
 
 // These are not really necessary for now i htink, but leaving this for now (dont use these unless you want to just read once)
 /**
@@ -445,4 +479,14 @@ export async function readAppointments(
   uid: string
 ): Promise<FirestoreResult<Appointment[]>> {
   return readUserSubcollectionDocs(db, uid, "appointments", snapshotToAppointment);
+}
+
+/**
+ * Reads all documents for the given user from users/{uid}/documents.
+ */
+export async function readDocuments(
+  db: Firestore,
+  uid: string
+): Promise<FirestoreResult<DocumentType[]>> {
+  return readUserSubcollectionDocs(db, uid, "documents", snapshotToDocument);
 }

@@ -14,12 +14,14 @@ import {
   subscribeActionItems,
   subscribeSessionMetadata,
   subscribeAppointments,
+  subscribeDocuments,
 } from "./api";
 import { sortHealthNotesByCreatedDesc } from "./healthNotes";
 import { sortSessionsByDateDesc } from "./sessions";
 import type {
   ActionItem,
   Appointment,
+  Document,
   HealthNote,
   SessionMetadata,
   UserMetadata,
@@ -294,6 +296,51 @@ export function useSessionMetadata(): SessionMetadataState {
           loading: false,
           error: null,
         }),
+      (err) => setState((s) => ({ ...s, error: err, loading: false }))
+    );
+
+    return unsubscribe;
+  }, [authLoading, uid]);
+
+  return state;
+}
+
+type DocumentsState = {
+  documents: Document[];
+  loading: boolean;
+  error: Error | null;
+};
+
+/**
+ * Real-time subscription to the authenticated user's documents.
+ */
+export function useDocuments(): DocumentsState {
+  const { user, loading: authLoading } = useAuth();
+  const uid = user?.uid ?? null;
+
+  const [state, setState] = useState<DocumentsState>({
+    documents: [],
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (authLoading || !uid) {
+      setState((s) => ({ ...s, loading: !!authLoading }));
+      return;
+    }
+
+    setState((s) => ({ ...s, loading: true, error: null }));
+
+    const unsubscribe = subscribeDocuments(
+      db,
+      uid,
+      (data) => {
+        const sorted = [...data].sort(
+          (a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()
+        );
+        setState({ documents: sorted, loading: false, error: null });
+      },
       (err) => setState((s) => ({ ...s, error: err, loading: false }))
     );
 
