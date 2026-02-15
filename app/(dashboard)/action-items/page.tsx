@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { HiOutlineMenuAlt4, HiOutlineTrash, HiChevronDown } from "react-icons/hi";
 import { Spinner } from "@/app/components/Spinner";
 import { Toast } from "@/app/components/Toast";
@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import {
   ACTION_ITEM_STATUSES,
   deleteActionItem,
+  isPastStatus,
   sortActionItemsByPriorityAndDueDate,
   useActionItems,
   writeActionItem,
@@ -29,6 +30,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending: "bg-blue-50 text-blue-700 border-blue-200",
   in_progress: "bg-amber-50 text-amber-700 border-amber-200",
   done: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  skipped: "bg-neutral-100 text-neutral-500 border-neutral-300",
 };
 
 function StatusDropdown({
@@ -152,12 +154,44 @@ function ErrorState({ message }: { message: string }) {
   );
 }
 
+function ActionItemList({
+  items,
+  onDelete,
+  onStatusChange,
+}: {
+  items: ActionItem[];
+  onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: ActionItemStatus) => void;
+}) {
+  return (
+    <ul className="flex flex-col gap-3 list-none p-0 m-0">
+      {items.map((item) => (
+        <li key={item.id}>
+          <ActionItemCard item={item} onDelete={onDelete} onStatusChange={onStatusChange} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function ActionItemsPage() {
   const { actionItems, loading, error } = useActionItems();
   const { openDrawer } = useDrawer() ?? {};
   const { user } = useAuth();
   const [operationError, setOperationError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const { current, past } = useMemo(() => {
+    const cur: ActionItem[] = [];
+    const pst: ActionItem[] = [];
+    for (const item of actionItems) {
+      (isPastStatus(item.status) ? pst : cur).push(item);
+    }
+    return {
+      current: sortActionItemsByPriorityAndDueDate(cur),
+      past: sortActionItemsByPriorityAndDueDate(pst),
+    };
+  }, [actionItems]);
 
   const handleDelete = async (itemId: string) => {
     if (!user?.uid) return;
@@ -224,14 +258,18 @@ export default function ActionItemsPage() {
 
       {!loading && !error && actionItems.length === 0 && <EmptyState />}
 
-      {!loading && !error && actionItems.length > 0 && (
-        <ul className="flex flex-col gap-3 list-none p-0 m-0">
-          {sortActionItemsByPriorityAndDueDate(actionItems).map((item) => (
-            <li key={item.id}>
-              <ActionItemCard item={item} onDelete={handleDelete} onStatusChange={handleStatusChange} />
-            </li>
-          ))}
-        </ul>
+      {!loading && !error && current.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-neutral-700 mb-2">Current</h2>
+          <ActionItemList items={current} onDelete={handleDelete} onStatusChange={handleStatusChange} />
+        </section>
+      )}
+
+      {!loading && !error && past.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-neutral-400 mb-2">Past</h2>
+          <ActionItemList items={past} onDelete={handleDelete} onStatusChange={handleStatusChange} />
+        </section>
       )}
       </div>
     </div>

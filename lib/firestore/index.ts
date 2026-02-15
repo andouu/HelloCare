@@ -24,7 +24,7 @@ export type {
   UserMetadata,
   UserMetadataUpdatePayload,
 } from "./types";
-export { ACTION_ITEM_STATUSES, sortActionItemsByPriorityAndDueDate } from "./actionItems";
+export { ACTION_ITEM_STATUSES, isPastStatus, sortActionItemsByPriorityAndDueDate } from "./actionItems";
 export type { ActionItemStatus } from "./actionItems";
 export { sortHealthNotesByCreatedDesc } from "./healthNotes";
 export { toFirestoreValue } from "./serialize";
