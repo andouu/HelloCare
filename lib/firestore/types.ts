@@ -45,9 +45,10 @@ export type ActionItemSerialized = Omit<ActionItemCreate, "dueBy"> & {
   dueBy: string | null;
 };
 
-/** Create payload for session metadata (actionItems/documentIds can default to []). */
-export type SessionMetadataCreate = Omit<SessionMetadata, "userId"> & {
-  actionItems?: ActionItem[];
+/** Create payload for session metadata (id can be generated; actionItemIds/documentIds can default to []). */
+export type SessionMetadataCreate = Omit<SessionMetadata, "userId" | "id"> & {
+  id?: string;
+  actionItemIds?: string[];
   documentIds?: string[];
 };
 
@@ -87,13 +88,13 @@ export type ActionItem = {
 };
 
 
-/** Session document. documentIds: optional list of stored document references. */
+/** Session document. actionItemIds: references to action item docs (mutable by user). documentIds: optional list of stored document references. */
 export type SessionMetadata = {
   id: string;
   userId: string;
   date: Date;
   title: string;
   summary: string;
-  actionItems: ActionItem[];
+  actionItemIds: string[];
   documentIds: string[];
 };

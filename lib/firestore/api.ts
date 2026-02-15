@@ -175,7 +175,7 @@ export async function writeSessionMetadata(
   const docData: SessionMetadata = {
     ...data,
     userId: uid,
-    actionItems: data.actionItems ?? [],
+    actionItemIds: data.actionItemIds ?? [],
     documentIds: data.documentIds ?? [],
   };
   return writeUserSubcollectionDoc(db, uid, "sessionMetadata", docData);
@@ -213,6 +213,14 @@ export async function deleteActionItem(
   itemId: string
 ): Promise<FirestoreResult<void>> {
   return deleteUserSubcollectionDoc(db, uid, "actionItems", itemId);
+}
+
+export async function deleteSessionMetadata(
+  db: Firestore,
+  uid: string,
+  sessionId: string
+): Promise<FirestoreResult<void>> {
+  return deleteUserSubcollectionDoc(db, uid, "sessionMetadata", sessionId);
 }
 
 function snapshotToHealthNote(snap: DocumentSnapshot): HealthNote | null {
@@ -267,42 +275,11 @@ function snapshotToActionItem(snap: DocumentSnapshot): ActionItem | null {
 function snapshotToSessionMetadata(snap: DocumentSnapshot): SessionMetadata | null {
   const data = snap.data();
   if (!data || typeof data.userId !== "string") return null;
-  const rawItems = Array.isArray(data.actionItems) ? data.actionItems : [];
-  const actionItems = rawItems
-    .map((item: unknown) => {
-      if (!item || typeof item !== "object") return null;
-      const o = item as Record<string, unknown>;
-      const med = o.medication;
-      const medication =
-        med &&
-        typeof med === "object" &&
-        "name" in med &&
-        "dose" in med &&
-        "dosageUnit" in med &&
-        "count" in med &&
-        "route" in med
-          ? {
-              name: String((med as Record<string, unknown>).name),
-              dose: Number((med as Record<string, unknown>).dose),
-              dosageUnit: String((med as Record<string, unknown>).dosageUnit),
-              count: Number((med as Record<string, unknown>).count),
-              route: String((med as Record<string, unknown>).route),
-            }
-          : undefined;
-      return {
-        id: typeof o.id === "string" ? o.id : "",
-        userId: typeof o.userId === "string" ? o.userId : "",
-        dueBy: toDate(o.dueBy),
-        type: typeof o.type === "string" ? o.type : "",
-        title: typeof o.title === "string" ? o.title : "",
-        description: typeof o.description === "string" ? o.description : "",
-        status: typeof o.status === "string" ? o.status : "",
-        priority: typeof o.priority === "string" ? o.priority : "",
-        recurrence: typeof o.recurrence === "string" ? o.recurrence : "",
-        medication,
-      } as ActionItem;
-    })
-    .filter((item): item is ActionItem => item != null);
+  const actionItemIds = Array.isArray(data.actionItemIds)
+    ? (data.actionItemIds as unknown[]).filter((id): id is string => typeof id === "string")
+    : Array.isArray((data as { actionItems?: unknown[] }).actionItems)
+      ? [] // legacy: old docs had actionItems; treat as no refs
+      : [];
   const documentIds = Array.isArray(data.documentIds)
     ? (data.documentIds as unknown[]).filter((id): id is string => typeof id === "string")
     : [];
@@ -312,7 +289,7 @@ function snapshotToSessionMetadata(snap: DocumentSnapshot): SessionMetadata | nu
     date: toDate(data.date),
     title: typeof data.title === "string" ? data.title : "",
     summary: typeof data.summary === "string" ? data.summary : "",
-    actionItems,
+    actionItemIds,
     documentIds,
   };
 }

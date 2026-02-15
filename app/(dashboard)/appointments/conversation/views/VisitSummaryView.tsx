@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { TbArrowBackUp, TbUpload, TbLoader2, TbCheck, TbAlertTriangle } from "react-icons/tb";
 import { useSaveEntry } from "@/lib/firestore/hooks";
 import { sortActionItemsByPriorityAndDueDate } from "@/lib/firestore";
-import type { ActionItemCreate, ActionItemSerialized } from "@/lib/firestore/types";
+import type { ActionItem, ActionItemCreate, ActionItemSerialized } from "@/lib/firestore/types";
 import type { ConversationViewPropsMap } from "../types";
 
 type Props = ConversationViewPropsMap["visitSummary"];
@@ -176,26 +176,44 @@ export function VisitSummaryView({
   const { save } = useSaveEntry();
   const didSaveRef = useRef(false);
 
-  // Persist action items to Firestore once the LLM returns them.
+  // Persist action items and session metadata to Firestore once the LLM returns them.
   useEffect(() => {
     if (state.status !== "success") return;
-    if (state.actionItems.length === 0) return;
     if (didSaveRef.current) return; // prevent duplicate saves (StrictMode)
     didSaveRef.current = true;
 
     setSaveStatus("saving");
 
-    const writes = state.actionItems.map((item) =>
-      save("actionItems", toActionItemCreate(item)),
-    );
+    const writes =
+      state.actionItems.length > 0
+        ? state.actionItems.map((item) =>
+            save("actionItems", toActionItemCreate(item)),
+          )
+        : [Promise.resolve({ ok: true as const, data: null })];
 
     Promise.all(writes)
-      .then((results) => {
-        const anyFailed = results.some((r) => r && !r.ok);
+      .then(async (results) => {
+        const actionItemResults = state.actionItems.length > 0 ? results : [];
+        const anyFailed = actionItemResults.some((r) => r && !r.ok);
         setSaveStatus(anyFailed ? "error" : "saved");
+
+        const actionItemIds =
+          actionItemResults.length > 0
+            ? (actionItemResults as Array<{ ok: true; data: ActionItem }>)
+                .filter((r): r is { ok: true; data: ActionItem } => r?.ok === true && r.data != null)
+                .map((r) => r.data.id)
+            : [];
+
+        await save("sessionMetadata", {
+          date: appointmentDate,
+          title: `Visit – ${dateLabel}`,
+          summary: state.discussionTopics.join("\n"),
+          actionItemIds,
+          documentIds: [],
+        });
       })
       .catch(() => setSaveStatus("error"));
-  }, [state, save]);
+  }, [state, save, appointmentDate, dateLabel]);
 
   useEffect(() => {
     const transcript = segments.join("\n\n").trim();
