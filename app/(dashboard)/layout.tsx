@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { createContext, useCallback, useContext, useState } from "react";
-import { HiCalendar, HiChatAlt2, HiClipboardList, HiClock, HiDocumentText, HiHome, HiLogout } from "react-icons/hi";
+import { HiCalendar, HiChatAlt2, HiClipboardList, HiClock, HiDocumentText, HiHome, HiLogout, HiCamera } from "react-icons/hi";
 import { Drawer } from "@/app/components";
 import { Spinner } from "@/app/components/Spinner";
 import { useAuth } from "@/lib/auth-context";
@@ -15,6 +15,7 @@ const DRAWER_MENU_ITEMS = [
   { label: "Appointments", href: "/appointments", icon: HiClock },
   { label: "Past Sessions", href: "/past-sessions", icon: HiCalendar },
   { label: "Conversation", href: "/appointments/conversation", icon: HiChatAlt2 },
+  { label: "Upload Care Packet", href: "/upload-care-packet", icon: HiCamera },
 ] as const;
 
 type DrawerContextValue = {
