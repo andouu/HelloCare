@@ -15,6 +15,7 @@ import {
   subscribeSessionMetadata,
 } from "./api";
 import { sortHealthNotesByCreatedDesc } from "./healthNotes";
+import { sortSessionsByDateDesc } from "./sessions";
 import type {
   ActionItem,
   HealthNote,
@@ -241,7 +242,7 @@ export function useUserData() {
     }, onError);
 
     const unsubSm = subscribeSessionMetadata(db, uid, (data) => {
-      setState((s) => ({ ...s, sessionMetadata: data }));
+      setState((s) => ({ ...s, sessionMetadata: sortSessionsByDateDesc(data) }));
       markReceived();
     }, onError);
 
@@ -250,6 +251,51 @@ export function useUserData() {
       unsubAi();
       unsubSm();
     };
+  }, [authLoading, uid]);
+
+  return state;
+}
+
+type SessionMetadataState = {
+  sessionMetadata: SessionMetadata[];
+  loading: boolean;
+  error: Error | null;
+};
+
+/**
+ * Real-time subscription to the authenticated user's session metadata only.
+ */
+export function useSessionMetadata(): SessionMetadataState {
+  const { user, loading: authLoading } = useAuth();
+  const uid = user?.uid ?? null;
+
+  const [state, setState] = useState<SessionMetadataState>({
+    sessionMetadata: [],
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (authLoading || !uid) {
+      setState((s) => ({ ...s, loading: !!authLoading }));
+      return;
+    }
+
+    setState((s) => ({ ...s, loading: true, error: null }));
+
+    const unsubscribe = subscribeSessionMetadata(
+      db,
+      uid,
+      (data) =>
+        setState({
+          sessionMetadata: sortSessionsByDateDesc(data),
+          loading: false,
+          error: null,
+        }),
+      (err) => setState((s) => ({ ...s, error: err, loading: false }))
+    );
+
+    return unsubscribe;
   }, [authLoading, uid]);
 
   return state;

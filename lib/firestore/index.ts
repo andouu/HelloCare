@@ -27,17 +27,19 @@ export type {
 export { ACTION_ITEM_PRIORITIES, ACTION_ITEM_STATUSES, ACTION_ITEM_TYPES, isPastStatus, sortActionItemsByPriorityAndDueDate } from "./actionItems";
 export type { ActionItemStatus } from "./actionItems";
 export { HEALTH_NOTE_TYPES, sortHealthNotesByCreatedDesc } from "./healthNotes";
+export { sortSessionsByDateDesc } from "./sessions";
 export { toFirestoreValue } from "./serialize";
 export {
   readUserMetadata,
   deleteActionItem,
   deleteHealthNote,
+  deleteSessionMetadata,
   writeActionItem,
   writeHealthNote,
   writeSessionMetadata,
   writeUserMetadata,
 } from "./api";
-export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useHealthNotes } from "./hooks";
+export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useHealthNotes, useSessionMetadata } from "./hooks";
 export {
   ENTRY_FORM_CONFIGS,
   ENTRY_TYPES,

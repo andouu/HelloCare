@@ -197,7 +197,7 @@ export function formValuesToEntryPayload(
         title: values.title ?? "",
         summary: values.summary ?? "",
         date: parseDate(values.date),
-        actionItems: [],
+        actionItemIds: [],
         documentIds: [],
       };
     default:
