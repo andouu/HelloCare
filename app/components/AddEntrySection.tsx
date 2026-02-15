@@ -11,7 +11,6 @@ import {
   formValuesToEntryPayload,
 } from "@/lib/firestore";
 import type { EntryType } from "@/lib/firestore";
-import { isDebugLoggingEnabled } from "@/lib/logger";
 
 function EntryForm({
   entryType,
@@ -157,16 +156,6 @@ export function AddEntrySection() {
         </button>
       </div>
 
-      {isDebugLoggingEnabled && userMetadata && ( // ezier to debug
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-            Your profile (users/{"{uid}"})
-          </h3>
-          <pre className="overflow-auto rounded-lg border border-zinc-200 bg-white p-4 text-left text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-            {JSON.stringify(userMetadata, null, 2)}
-          </pre>
-        </div>
-      )}
     </section>
   );
 }

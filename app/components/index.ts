@@ -6,5 +6,6 @@
 export { ProfileForm } from "./ProfileForm";
 export type { ProfileFormProps } from "./ProfileForm";
 export { AddEntrySection } from "./AddEntrySection";
+export { DebugDataPanel } from "./DebugDataPanel";
 export { HomeLayout } from "./HomeLayout";
 export { HomeHero } from "./HomeHero";
