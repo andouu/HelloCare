@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useUserMetadata } from "@/lib/firestore";
+import { useI18n } from "@/app/components/I18nProvider";
+import { DEFAULT_LANGUAGE_TAG } from "@/lib/i18n/locales";
 import { OnboardingFormData } from "./types";
 import { StepWrapper } from "./components/StepWrapper";
 import { Step0 } from "./components/Step0";
@@ -13,6 +15,7 @@ import { Step3 } from "./components/Step3";
 import { Step4 } from "./components/Step4";
 
 export default function Onboarding() {
+  const { t } = useI18n();
   const { user, loading: authLoading } = useAuth();
   const { loading, isOnboarded, saveProfile } = useUserMetadata();
   const router = useRouter();
@@ -33,7 +36,7 @@ export default function Onboarding() {
   const [formData, setFormData] = useState<OnboardingFormData>({
     firstName: "",
     lastName: "",
-    language: "US English",
+    language: DEFAULT_LANGUAGE_TAG,
     phone: "",
   });
 
@@ -51,7 +54,7 @@ export default function Onboarding() {
     if (result.ok) {
       router.replace("/");
     } else {
-      setSaveError(result.error?.message ?? "Failed to save profile");
+      setSaveError(result.error?.message ?? t("onboarding.saveError"));
     }
   };
 

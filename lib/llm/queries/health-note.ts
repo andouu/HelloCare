@@ -64,13 +64,14 @@ When status is "NOT_ENOUGH_DATA", use empty strings for type, title, and descrip
  */
 export async function extractHealthNoteFromTranscript(
   transcript: string,
+  languageTag: string = "en-US",
 ): Promise<HealthNoteContent> {
   const { output } = await queryLLMStructured({
     name: "HealthNote",
     description:
       "A structured health note extracted from a voice transcript, or NOT_ENOUGH_DATA if extraction is not possible",
     schema: healthNoteContentSchema,
-    prompt: buildHealthNotePrompt(transcript),
+    prompt: `${buildHealthNotePrompt(transcript)}\n\nWrite the output text fields in ${languageTag}.`,
   });
 
   return output;

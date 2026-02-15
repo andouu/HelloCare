@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
+import { useI18n } from "@/app/components/I18nProvider";
 import { Spinner } from "@/app/components/Spinner";
 import { Toast } from "@/app/components/Toast";
 import { useDrawer } from "@/app/(dashboard)/layout";
@@ -19,16 +20,7 @@ import {
 } from "@/lib/firestore";
 import type { ActionItem, SessionMetadata } from "@/lib/firestore";
 import { PillDropdown } from "@/app/components/PillDropdown";
-
-/** Format as day, month, year only. */
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
-}
-
-/** Format due date for compact display. */
-function formatDueDateShort(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
-}
+import type { MessageKey } from "@/lib/i18n/messages";
 
 const PRIORITY_STYLES: Record<string, string> = {
   high: "bg-rose-100 text-rose-800 border-rose-200",
@@ -45,9 +37,13 @@ const STATUS_STYLES: Record<string, string> = {
 
 function LinkedActionItemCard({
   item,
+  formatDate,
+  t,
   onFieldChange,
 }: {
   item: ActionItem;
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   onFieldChange: (id: string, field: string, value: string) => void;
 }) {
   return (
@@ -56,30 +52,30 @@ function LinkedActionItemCard({
         href={`/action-items?highlight=${encodeURIComponent(item.id)}`}
         className="block focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 focus:rounded"
       >
-        <p className="text-sm font-medium text-neutral-900">{item.title || "Untitled"}</p>
+        <p className="text-sm font-medium text-neutral-900">{item.title || t("pastSessions.untitled")}</p>
       </Link>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
         <PillDropdown
           value={item.type}
           options={ACTION_ITEM_TYPES}
           onChange={(v) => onFieldChange(item.id, "type", v)}
-          ariaLabel="Change type"
+          ariaLabel={t("pastSessions.changeType")}
         />
         <PillDropdown
           value={item.priority}
           options={ACTION_ITEM_PRIORITIES}
           onChange={(v) => onFieldChange(item.id, "priority", v)}
           styles={PRIORITY_STYLES}
-          ariaLabel="Change priority"
+          ariaLabel={t("pastSessions.changePriority")}
         />
         <PillDropdown
           value={item.status}
           options={ACTION_ITEM_STATUSES}
           onChange={(v) => onFieldChange(item.id, "status", v)}
           styles={STATUS_STYLES}
-          ariaLabel="Change status"
+          ariaLabel={t("pastSessions.changeStatus")}
         />
-        <span className="text-xs text-neutral-500">Due: {formatDueDateShort(item.dueBy)}</span>
+        <span className="text-xs text-neutral-500">{t("pastSessions.due", { date: formatDate(item.dueBy, { month: "short", day: "numeric", year: "numeric" }) })}</span>
       </div>
     </div>
   );
@@ -88,11 +84,15 @@ function LinkedActionItemCard({
 function SessionCard({
   session,
   linkedActionItems,
+  formatDate,
+  t,
   onDelete,
   onActionItemFieldChange,
 }: {
   session: SessionMetadata;
   linkedActionItems: ActionItem[];
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   onDelete: (id: string) => void;
   onActionItemFieldChange: (id: string, field: string, value: string) => void;
 }) {
@@ -105,31 +105,33 @@ function SessionCard({
         type="button"
         onClick={() => onDelete(session.id)}
         className="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-        aria-label={`Delete ${session.title || "session"}`}
+        aria-label={t("pastSessions.deleteAria", { name: session.title || t("pastSessions.untitledVisit") })}
       >
         <HiOutlineTrash className="w-4 h-4" />
       </button>
       <div className="flex flex-col gap-2 pr-8">
         <h3 className="text-base font-semibold text-neutral-900">
-          {session.title || "Untitled visit"}
+          {session.title || t("pastSessions.untitledVisit")}
         </h3>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
-          <span>Date: {formatDate(session.date)}</span>
+          <span>{t("pastSessions.date", { date: formatDate(session.date, { dateStyle: "medium" }) })}</span>
         </div>
         {session.summary ? (
           <div className="mt-1">
-            <p className="text-xs font-medium text-neutral-500 mb-1">Summary</p>
+            <p className="text-xs font-medium text-neutral-500 mb-1">{t("pastSessions.summary")}</p>
             <p className="text-sm text-neutral-600 whitespace-pre-wrap">{session.summary}</p>
           </div>
         ) : null}
         {linkedActionItems.length > 0 ? (
           <div className="mt-2 w-full">
-            <p className="text-xs font-medium text-neutral-500 mb-1.5">Linked action items</p>
+            <p className="text-xs font-medium text-neutral-500 mb-1.5">{t("pastSessions.linkedActionItems")}</p>
             <div className="flex flex-col gap-2 w-full">
               {linkedActionItems.map((item) => (
                 <LinkedActionItemCard
                   key={item.id}
                   item={item}
+                  formatDate={formatDate}
+                  t={t}
                   onFieldChange={onActionItemFieldChange}
                 />
               ))}
@@ -141,32 +143,39 @@ function SessionCard({
   );
 }
 
-function EmptyState() {
+function EmptyState({ t }: { t: (key: MessageKey, vars?: Record<string, string | number>) => string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/50 py-12 px-6 text-center">
-      <p className="text-sm font-medium text-neutral-600">No past sessions yet</p>
+      <p className="text-sm font-medium text-neutral-600">{t("pastSessions.emptyTitle")}</p>
       <p className="text-xs text-neutral-500 max-w-xs">
-        Visit summaries from your appointments will show up here after you
-        complete a conversation and save the summary.
+        {t("pastSessions.emptyBody")}
       </p>
     </div>
   );
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({
+  message,
+  t,
+}: {
+  message: string;
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
+}) {
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-center">
-      <p className="text-sm font-medium text-rose-800">Something went wrong</p>
+      <p className="text-sm font-medium text-rose-800">{t("common.somethingWentWrong")}</p>
       <p className="mt-1 text-xs text-rose-700">{message}</p>
     </div>
   );
 }
 
 export default function PastSessionsPage() {
+  const { t, formatDate } = useI18n();
   const { sessionMetadata, loading, error } = useSessionMetadata();
   const { actionItems } = useActionItems();
   const { openDrawer } = useDrawer() ?? {};
   const { user } = useAuth();
+  const uid = user?.uid;
   const [operationError, setOperationError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -188,11 +197,11 @@ export default function PastSessionsPage() {
   );
 
   const handleDelete = async (sessionId: string) => {
-    if (!user?.uid) return;
+    if (!uid) return;
     setOperationError(null);
-    const result = await deleteSessionMetadata(db, user.uid, sessionId);
+    const result = await deleteSessionMetadata(db, uid, sessionId);
     if (result.ok) {
-      setToastMessage("Deleted");
+      setToastMessage(t("common.deleted"));
     } else {
       setOperationError(result.error.message);
     }
@@ -200,18 +209,18 @@ export default function PastSessionsPage() {
 
   const handleActionItemFieldChange = useCallback(
     async (itemId: string, field: string, value: string) => {
-      if (!user?.uid) return;
+      if (!uid) return;
       setOperationError(null);
       const item = actionItems.find((ai) => ai.id === itemId);
       if (!item) return;
-      const result = await writeActionItem(db, user.uid, { ...item, [field]: value });
+      const result = await writeActionItem(db, uid, { ...item, [field]: value });
       if (result.ok) {
-        setToastMessage("Updated");
+        setToastMessage(t("common.updated"));
       } else {
         setOperationError(result.error.message);
       }
     },
-    [user?.uid, actionItems]
+    [uid, actionItems, t]
   );
 
   const dismissToast = useCallback(() => setToastMessage(null), []);
@@ -224,16 +233,16 @@ export default function PastSessionsPage() {
           type="button"
           onClick={() => openDrawer?.()}
           className="p-2 -ml-2 rounded-lg text-neutral-900 hover:bg-neutral-100 transition-colors"
-          aria-label="Open menu"
+          aria-label={t("home.openMenu")}
         >
           <HiOutlineMenuAlt4 className="w-6 h-6" />
         </button>
-        <h1 className="text-lg font-semibold text-neutral-900">Past Sessions</h1>
+        <h1 className="text-lg font-semibold text-neutral-900">{t("pastSessions.title")}</h1>
         <div className="w-10" aria-hidden />
       </header>
       <div className="flex-1 flex flex-col gap-6 p-4 overflow-auto">
         <p className="text-sm text-neutral-500">
-          Visit summaries from your appointments.
+          {t("pastSessions.subtitle")}
         </p>
 
         {operationError && (
@@ -245,13 +254,13 @@ export default function PastSessionsPage() {
         {loading && (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
             <Spinner size="lg" theme="neutral" />
-            <span className="text-sm text-neutral-500">Loading past sessions…</span>
+            <span className="text-sm text-neutral-500">{t("pastSessions.loading")}</span>
           </div>
         )}
 
-        {!loading && error && <ErrorState message={error.message} />}
+        {!loading && error && <ErrorState message={error.message} t={t} />}
 
-        {!loading && !error && sessionMetadata.length === 0 && <EmptyState />}
+        {!loading && !error && sessionMetadata.length === 0 && <EmptyState t={t} />}
 
         {!loading && !error && sessionMetadata.length > 0 && (
           <ul className="flex flex-col gap-3 list-none p-0 m-0">
@@ -260,6 +269,8 @@ export default function PastSessionsPage() {
                 <SessionCard
                   session={session}
                   linkedActionItems={getLinkedActionItems(session)}
+                  formatDate={formatDate}
+                  t={t}
                   onDelete={handleDelete}
                   onActionItemFieldChange={handleActionItemFieldChange}
                 />

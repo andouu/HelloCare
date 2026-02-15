@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { createContext, useCallback, useContext, useState } from "react";
 import { HiCalendar, HiChatAlt2, HiClipboardList, HiClock, HiDocumentText, HiHome, HiLogout } from "react-icons/hi";
+import { useI18n } from "@/app/components/I18nProvider";
 import { Drawer } from "@/app/components";
 import { Spinner } from "@/app/components/Spinner";
 import { useAuth } from "@/lib/auth-context";
 import { useUserMetadata } from "@/lib/firestore";
 
 const DRAWER_MENU_ITEMS = [
-  { label: "Home", href: "/", icon: HiHome },
-  { label: "Action Items", href: "/action-items", icon: HiClipboardList },
-  { label: "Health Notes", href: "/health-notes", icon: HiDocumentText },
-  { label: "Appointments", href: "/appointments", icon: HiClock },
-  { label: "Past Sessions", href: "/past-sessions", icon: HiCalendar },
-  { label: "Conversation", href: "/appointments/conversation", icon: HiChatAlt2 },
+  { key: "drawer.home", href: "/", icon: HiHome },
+  { key: "drawer.actionItems", href: "/action-items", icon: HiClipboardList },
+  { key: "drawer.healthNotes", href: "/health-notes", icon: HiDocumentText },
+  { key: "drawer.appointments", href: "/appointments", icon: HiClock },
+  { key: "drawer.pastSessions", href: "/past-sessions", icon: HiCalendar },
+  { key: "drawer.conversation", href: "/appointments/conversation", icon: HiChatAlt2 },
 ] as const;
 
 type DrawerContextValue = {
@@ -33,6 +34,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const { user, signOut } = useAuth();
   const { data: userMetadata } = useUserMetadata();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -69,8 +71,8 @@ export default function DashboardLayout({
         userAvatarUrl={user?.photoURL ?? undefined}
       >
         <div className="flex min-h-full flex-col">
-          <nav className="flex flex-col gap-0.5" aria-label="Menu">
-            {DRAWER_MENU_ITEMS.map(({ label, href, icon: Icon }) => (
+          <nav className="flex flex-col gap-0.5" aria-label={t("drawer.menuAria")}>
+            {DRAWER_MENU_ITEMS.map(({ key, href, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -78,7 +80,7 @@ export default function DashboardLayout({
                 className="flex w-full items-center gap-2.5 rounded-lg py-2.5 text-left text-neutral-900 hover:bg-neutral-50 transition-colors"
               >
                 <Icon className="h-5 w-5 shrink-0 text-neutral-900" aria-hidden />
-                <span>{label}</span>
+                <span>{t(key)}</span>
               </Link>
             ))}
           </nav>
@@ -94,7 +96,7 @@ export default function DashboardLayout({
                 <Spinner size="sm" theme="neutral" />
               </span>
             ) : (
-              <span className="flex-1 text-center">Sign out</span>
+              <span className="flex-1 text-center">{t("drawer.signOut")}</span>
             )}
             <span className="w-4 shrink-0" aria-hidden />
           </button>

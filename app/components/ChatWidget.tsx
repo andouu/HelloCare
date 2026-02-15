@@ -9,6 +9,7 @@ import {
   HiOutlineCalendar,
   HiOutlinePencil,
 } from "react-icons/hi2";
+import { useI18n } from "@/app/components/I18nProvider";
 import { RecordHealthNoteModal } from "./RecordHealthNoteModal";
 import { useStreamingTranscription } from "@/app/hooks/useStreamingTranscription";
 import { Spinner } from "./Spinner";
@@ -102,6 +103,7 @@ function RecordingWaveform({ level }: { level: number }) {
 }
 
 export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }: ChatWidgetProps) {
+  const { t, languageTag } = useI18n();
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -119,6 +121,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
     isSupported,
     tokenStatus,
   } = useStreamingTranscription({
+    languageTag,
     onAudioLevel: useCallback((level: number) => setAudioLevel(level), []),
   });
 
@@ -202,14 +205,14 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
           className="flex items-center gap-1.5 rounded-full bg-neutral-800 px-3 py-2.5 text-xs text-white transition-colors hover:bg-neutral-700 active:bg-neutral-700"
         >
           <HiOutlinePencil className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-          Record health note
+          {t("chatWidget.recordHealthNote")}
         </button>
         <Link
           href="/appointments/schedule"
           className="flex items-center gap-1.5 rounded-full bg-neutral-800 px-3 py-2.5 text-xs text-white transition-colors hover:bg-neutral-700 active:bg-neutral-700"
         >
           <HiOutlineCalendar className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-          Schedule appointment
+          {t("chatWidget.scheduleAppointment")}
         </Link>
       </div>
       <div className="flex items-center gap-2">
@@ -218,7 +221,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
           onClick={() => void handleMicToggle()}
           disabled={!canRecord || isStarting || isStopping}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300 disabled:opacity-60 disabled:cursor-not-allowed"
-          aria-label={isRecording ? "Stop recording" : "Start recording"}
+          aria-label={isRecording ? t("chatWidget.stopRecording") : t("chatWidget.startRecording")}
         >
           {isStarting || isStopping ? (
             <Spinner size="sm" />
@@ -239,7 +242,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             type="text"
-            placeholder="Ask any question..."
+            placeholder={t("chatWidget.placeholder")}
             disabled={disabled}
             className="min-w-0 flex-1 rounded-full border border-neutral-300 bg-white px-4 py-2.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
           />
@@ -249,7 +252,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
           onClick={handleSend}
           disabled={disabled || isWaveformMode}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 disabled:cursor-not-allowed"
-          aria-label="Send"
+          aria-label={t("chatWidget.send")}
         >
           <HiOutlineArrowUp className="h-4 w-4" strokeWidth={3} />
         </button>

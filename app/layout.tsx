@@ -1,4 +1,5 @@
 import { AuthProvider } from "@/lib/auth-context";
+import { I18nProvider } from "@/app/components/I18nProvider";
 import { RouteGuard } from "./components/RouteGuard";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Manrope } from "next/font/google";
@@ -35,7 +36,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} antialiased tracking-tight font-semibold font-sans`}
       >
         <AuthProvider>
-          <RouteGuard>{children}</RouteGuard>
+          <I18nProvider>
+            <RouteGuard>{children}</RouteGuard>
+          </I18nProvider>
         </AuthProvider>
       </body>
     </html>

@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { HiOutlineMenuAlt4 } from "react-icons/hi";
 import { TbArrowBackUp } from "react-icons/tb";
+import { useI18n } from "@/app/components/I18nProvider";
 import { useDrawer } from "@/app/(dashboard)/layout";
 import { useStreamingTranscription } from "@/app/hooks/useStreamingTranscription";
 import { VIEW_CARD_CLASS, VIEW_COMPONENTS } from "./views";
@@ -14,11 +15,12 @@ import { FULL_PAGE_VIEWS } from "./types";
 const TRAILING_WORD_COUNT = 15;
 
 export default function ConversationPage() {
+  const { t, formatDate, languageTag } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { openDrawer } = useDrawer() ?? {};
   const appointmentDate = parseDateFromSearchParams(searchParams);
-  const dateLabel = formatConversationDate(appointmentDate);
+  const dateLabel = formatConversationDate(appointmentDate, formatDate);
 
   const [view, setView] = useState<ConversationViewId>("idle");
   const [summarySegments, setSummarySegments] = useState<string[]>([]);
@@ -26,7 +28,6 @@ export default function ConversationPage() {
   const {
     startRecording,
     stopRecording,
-    isRecording,
     isStarting,
     isStopping,
     segments,
@@ -34,7 +35,7 @@ export default function ConversationPage() {
     isSupported,
     tokenStatus,
     clearTranscript,
-  } = useStreamingTranscription();
+  } = useStreamingTranscription({ languageTag });
 
   const trailingWords = useMemo(
     () => getTrailingWords(segments, interimTranscript, TRAILING_WORD_COUNT),
@@ -109,6 +110,7 @@ export default function ConversationPage() {
         return (
           <VIEW_COMPONENTS.summary
             segments={summarySegments}
+            languageTag={languageTag}
             onMarkCorrect={handleMarkCorrect}
             onMarkIncorrect={handleMarkIncorrect}
           />
@@ -134,11 +136,11 @@ export default function ConversationPage() {
             segments={summarySegments}
             dateLabel={dateLabel}
             appointmentDate={appointmentDate}
+            languageTag={languageTag}
             onGoHome={handleGoHome}
           />
         );
       default: {
-        const _: never = view;
         return null;
       }
     }
@@ -156,16 +158,16 @@ export default function ConversationPage() {
           type="button"
           onClick={() => openDrawer?.()}
           className="p-2 -ml-2 rounded-lg text-neutral-900 hover:bg-neutral-100 transition-colors"
-          aria-label="Open menu"
+          aria-label={t("home.openMenu")}
         >
           <HiOutlineMenuAlt4 className="w-6 h-6" />
         </button>
-        <h1 className="text-lg font-semibold text-neutral-900">Conversation</h1>
+        <h1 className="text-lg font-semibold text-neutral-900">{t("conversation.title")}</h1>
         <div className="w-10" aria-hidden />
       </header>
       <div className="flex-1 min-h-0 flex flex-col gap-5 p-4">
         <p className="text-sm text-neutral-500">
-          This conversation is about a doctor&apos;s visit on {dateLabel}
+          {t("conversation.subtitle", { date: dateLabel })}
         </p>
         <div
           className={`flex-1 min-h-0 flex flex-col rounded-2xl border px-4 transition-colors overflow-hidden ${VIEW_CARD_CLASS[view as keyof typeof VIEW_CARD_CLASS]}`}
@@ -181,7 +183,7 @@ export default function ConversationPage() {
           className="w-full h-12 text-sm text-white rounded-full flex items-center px-5 bg-red-500 active:bg-red-400"
         >
           <TbArrowBackUp className="w-4 h-4 shrink-0" aria-hidden />
-          <span className="flex-1 text-center">I don&apos;t want to record, go back</span>
+          <span className="flex-1 text-center">{t("conversation.cancelAndBack")}</span>
           <span className="w-4 shrink-0" aria-hidden />
         </button>
       </footer>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useI18n } from "@/app/components/I18nProvider";
 import {
   sortActionItemsByPriorityAndDueDate,
   useAppointments,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/firestore";
 import type { ActionItem, Appointment } from "@/lib/firestore";
 import { HiArrowRight, HiChatAlt2, HiClipboardList, HiClock } from "react-icons/hi";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 /** Pill style maps for read-only display (must match action-items / past-sessions for consistency). */
 const PRIORITY_STYLES: Record<string, string> = {
@@ -30,46 +32,64 @@ const MS_PER_HOUR = 60 * 60 * 1000;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 const MS_PER_WEEK = 7 * MS_PER_DAY;
 
-/** Time-until pill label and style (matches appointments page). */
-function getTimeUntil(appointmentTime: Date): { label: string; pillClass: string } {
-  const now = Date.now();
-  const t = appointmentTime.getTime();
-  const diff = t - now;
-  if (diff <= 0) {
-    const ago = Math.abs(diff);
-    if (ago < MS_PER_HOUR) return { label: "Just passed", pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
-    if (ago < MS_PER_DAY) return { label: `${Math.floor(ago / MS_PER_HOUR)}h ago`, pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
-    if (ago < MS_PER_WEEK) return { label: `${Math.floor(ago / MS_PER_DAY)}d ago`, pillClass: "bg-neutral-100 text-neutral-500 border-neutral-200" };
-    return { label: "Passed", pillClass: "bg-neutral-100 text-neutral-400 border-neutral-200" };
-  }
-  if (diff < MS_PER_HOUR) return { label: "In < 1 hour", pillClass: "bg-rose-100 text-rose-800 border-rose-200" };
-  if (diff < MS_PER_DAY) return { label: `In ${Math.ceil(diff / MS_PER_HOUR)}h`, pillClass: "bg-rose-50 text-rose-700 border-rose-200" };
-  if (diff < MS_PER_WEEK) return { label: `In ${Math.ceil(diff / MS_PER_DAY)} days`, pillClass: "bg-amber-50 text-amber-800 border-amber-200" };
-  return { label: `In ${Math.ceil(diff / MS_PER_DAY)} days`, pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
-}
-
-/** Suggested prompts shown when chat is available; clicking sends that message. */
-export const SUGGESTED_PROMPTS = [
-  "Summarize my overall health.",
-  "What action items do I have?",
-   "What are my upcoming appointments?",
-  "What happened in my previous health note?",
-  "Summarize my most recent health notes.",
-  "What are my most important action items?",
+export const SUGGESTED_PROMPT_KEYS: ReadonlyArray<MessageKey> = [
+  "homeSummary.prompt.overallHealth",
+  "homeSummary.prompt.actionItems",
+  "homeSummary.prompt.upcomingAppointments",
+  "homeSummary.prompt.lastHealthNote",
+  "homeSummary.prompt.recentHealthNotes",
+  "homeSummary.prompt.importantActionItems",
 ] as const;
 
-function formatDaysUntil(date: Date): string {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  const diffMs = target.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return "today";
-  if (diffDays === 1) return "tomorrow";
-  if (diffDays > 0 && diffDays <= 7) return `in ${diffDays} days`;
-  if (diffDays > 7) return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
-  return "";
+export function getSuggestedPrompts(
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): string[] {
+  return SUGGESTED_PROMPT_KEYS.map((key) => t(key));
+}
+
+/** Time-until pill label and style (matches appointments page). */
+function getTimeUntil(
+  appointmentTime: Date,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): { label: string; pillClass: string } {
+  const now = Date.now();
+  const tMs = appointmentTime.getTime();
+  const diff = tMs - now;
+  if (diff <= 0) {
+    const ago = Math.abs(diff);
+    if (ago < MS_PER_HOUR) return { label: t("time.justPassed"), pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+    if (ago < MS_PER_DAY) {
+      return {
+        label: t("time.hoursAgo", { count: Math.floor(ago / MS_PER_HOUR) }),
+        pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200",
+      };
+    }
+    if (ago < MS_PER_WEEK) {
+      return {
+        label: t("time.daysAgo", { count: Math.floor(ago / MS_PER_DAY) }),
+        pillClass: "bg-neutral-100 text-neutral-500 border-neutral-200",
+      };
+    }
+    return { label: t("time.passed"), pillClass: "bg-neutral-100 text-neutral-400 border-neutral-200" };
+  }
+
+  if (diff < MS_PER_HOUR) return { label: t("time.inLessThanHour"), pillClass: "bg-rose-100 text-rose-800 border-rose-200" };
+  if (diff < MS_PER_DAY) {
+    return {
+      label: t("time.inHours", { count: Math.ceil(diff / MS_PER_HOUR) }),
+      pillClass: "bg-rose-50 text-rose-700 border-rose-200",
+    };
+  }
+  if (diff < MS_PER_WEEK) {
+    return {
+      label: t("time.inDays", { count: Math.ceil(diff / MS_PER_DAY) }),
+      pillClass: "bg-amber-50 text-amber-800 border-amber-200",
+    };
+  }
+  return {
+    label: t("time.inDays", { count: Math.ceil(diff / MS_PER_DAY) }),
+    pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200",
+  };
 }
 
 /** Next upcoming appointment (soonest future), or null. */
@@ -81,12 +101,32 @@ function getNextUpcomingAppointment(appointments: Appointment[]): Appointment | 
   return future[0] ?? null;
 }
 
-function formatAppointmentLabel(appointment: Appointment): string {
+function formatAppointmentLabel(
+  appointment: Appointment,
+  now: Date,
+  formatDate: (date: Date | string | number, options?: Intl.DateTimeFormatOptions) => string,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): string {
   const date = appointment.appointmentTime;
-  const days = formatDaysUntil(date);
-  const time = new Intl.DateTimeFormat("en-US", { timeStyle: "short" }).format(date);
-  if (days) return `Appointment ${days} at ${time}`;
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
+
+  const currentDay = new Date(now);
+  currentDay.setHours(0, 0, 0, 0);
+
+  const targetDay = new Date(date);
+  targetDay.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.ceil((targetDay.getTime() - currentDay.getTime()) / MS_PER_DAY);
+  const time = formatDate(date, { timeStyle: "short" });
+
+  if (diffDays === 0) return t("homeSummary.appointmentTodayAt", { time });
+  if (diffDays === 1) return t("homeSummary.appointmentTomorrowAt", { time });
+  if (diffDays > 1 && diffDays <= 7) {
+    return t("homeSummary.appointmentInDaysAt", { days: diffDays, time });
+  }
+
+  return t("homeSummary.appointmentOn", {
+    datetime: formatDate(date, { dateStyle: "medium", timeStyle: "short" }),
+  });
 }
 
 type SummaryCard =
@@ -95,16 +135,18 @@ type SummaryCard =
 
 function getSummaryCards(
   appointments: Appointment[],
-  actionItems: ActionItem[]
+  actionItems: ActionItem[],
+  formatDate: (date: Date | string | number, options?: Intl.DateTimeFormatOptions) => string,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
 ): SummaryCard[] {
   const cards: SummaryCard[] = [];
 
   const nextAppointment = getNextUpcomingAppointment(appointments);
   if (nextAppointment) {
-    const { label: timeUntilLabel, pillClass: timeUntilPillClass } = getTimeUntil(nextAppointment.appointmentTime);
+    const { label: timeUntilLabel, pillClass: timeUntilPillClass } = getTimeUntil(nextAppointment.appointmentTime, t);
     cards.push({
       kind: "appointment",
-      label: formatAppointmentLabel(nextAppointment),
+      label: formatAppointmentLabel(nextAppointment, new Date(), formatDate, t),
       href: `/appointments?highlight=${encodeURIComponent(nextAppointment.id)}`,
       appointmentId: nextAppointment.id,
       timeUntilLabel,
@@ -116,7 +158,7 @@ function getSummaryCards(
   const remaining = 2;
   for (let i = 0; i < Math.min(remaining, sortedActionItems.length); i++) {
     const item = sortedActionItems[i];
-    const label = item.title || item.description || "Action item";
+    const label = item.title || item.description || t("homeSummary.actionItemFallback");
     cards.push({
       kind: "actionItem",
       label,
@@ -158,22 +200,23 @@ type HomeSummaryProps = {
 };
 
 export function HomeSummary({ suggestedPrompt, onPromptClick }: HomeSummaryProps) {
+  const { t, formatDate } = useI18n();
   const { data: userMetadata } = useUserMetadata();
   const userData = useUserData();
   const { appointments } = useAppointments();
 
   const firstName = userMetadata?.firstName || "there";
-  const cards = getSummaryCards(appointments, userData.actionItems);
+  const cards = getSummaryCards(appointments, userData.actionItems, formatDate, t);
   const showPrompt = suggestedPrompt && onPromptClick;
 
   return (
     <div className="flex flex-col items-center px-4 pt-[25vh] pb-4">
       <img src="/hellocare_logo.svg" alt="HelloCare Logo" width={40} height={40} />
       <h2 className="mt-4 text-xl font-bold text-neutral-900">
-        Welcome back, {firstName}!
+        {t("homeSummary.welcome", { name: firstName })}
       </h2>
       <p className="mt-1 text-sm text-neutral-500 text-center max-w-xs">
-        Below is a quick summary of your wellbeing and action items
+        {t("homeSummary.subtitle")}
       </p>
       {(cards.length > 0 || showPrompt) ? (
         <ul className="mt-8 w-full max-w-md flex flex-col gap-2">
@@ -226,7 +269,7 @@ export function HomeSummary({ suggestedPrompt, onPromptClick }: HomeSummaryProps
         </ul>
       ) : (
         <p className="max-w-xs mt-4 text-sm text-neutral-500 text-center">
-          No upcoming appointments or action items. Check back after your next visit.
+          {t("homeSummary.noCards")}
         </p>
       )}
     </div>

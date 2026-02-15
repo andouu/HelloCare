@@ -96,11 +96,13 @@ export type ActionItemOutput = z.infer<typeof actionItemOutputSchema>;
 function buildVisitSummaryPrompt(
   transcript: string,
   visitDate: string,
+  languageTag: string,
 ): string {
   return `You are a medical documentation specialist analyzing a doctor-patient conversation transcript. Your task is to extract structured information with absolute fidelity to what was discussed — do NOT add, infer, or fabricate any details not present in the transcript.
 
 Today's date: ${new Date().toISOString().split("T")[0]}
 Visit date: ${visitDate}
+Preferred output language: ${languageTag}
 
 ## Task 1: Discussion Topics
 
@@ -164,13 +166,14 @@ ${transcript}
 export async function extractVisitSummaryFromTranscript(
   transcript: string,
   visitDate: string,
+  languageTag: string = "en-US",
 ): Promise<VisitSummaryContent> {
   const { output } = await queryLLMStructured({
     name: "VisitSummary",
     description:
       "Structured visit summary with discussion topics and patient action items extracted from a doctor-patient conversation transcript",
     schema: visitSummarySchema,
-    prompt: buildVisitSummaryPrompt(transcript, visitDate),
+    prompt: buildVisitSummaryPrompt(transcript, visitDate, languageTag),
   });
 
   return output;

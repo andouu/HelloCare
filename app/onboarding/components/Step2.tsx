@@ -3,40 +3,24 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { IoCheckmark } from "react-icons/io5";
+import { useI18n } from "@/app/components/I18nProvider";
+import { LANGUAGE_OPTIONS } from "@/lib/i18n/locales";
 import { BaseStepProps } from "../types";
-
-const LANGUAGES = [
-  { code: "en-US", label: "US English", native: "English" },
-  { code: "en-GB", label: "UK English", native: "English" },
-  { code: "es", label: "Spanish", native: "Español" },
-  { code: "fr", label: "French", native: "Français" },
-  { code: "zh-cmn", label: "Mandarin Chinese", native: "普通话" },
-  { code: "zh-yue", label: "Cantonese Chinese", native: "廣東話" },
-  { code: "ko", label: "Korean", native: "한국어" },
-  { code: "ja", label: "Japanese", native: "日本語" },
-  { code: "vi", label: "Vietnamese", native: "Tiếng Việt" },
-  { code: "tl", label: "Tagalog", native: "Tagalog" },
-  { code: "ar", label: "Arabic", native: "العربية" },
-  { code: "pt", label: "Portuguese", native: "Português" },
-  { code: "ru", label: "Russian", native: "Русский" },
-  { code: "de", label: "German", native: "Deutsch" },
-  { code: "hi", label: "Hindi", native: "हिन्दी" },
-  { code: "it", label: "Italian", native: "Italiano" },
-];
 
 const DISMISS_THRESHOLD = 100;
 
 function LanguageModal({
   isOpen,
   onClose,
-  selectedLanguage,
+  selectedLanguageCode,
   onSelect,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  selectedLanguage: string;
-  onSelect: (label: string) => void;
+  selectedLanguageCode: string;
+  onSelect: (code: string) => void;
 }) {
+  const { t } = useI18n();
   const dragY = useMotionValue(0);
   const backdropOpacity = useTransform(dragY, [0, 400], [0.4, 0]);
   const backdropColor = useTransform(backdropOpacity, (v) => `rgba(0,0,0,${v})`);
@@ -97,10 +81,10 @@ function LanguageModal({
               onTouchEnd={onHandleTouchEnd}
             >
               <div className="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
-                <div className="w-9 h-1 rounded-full bg-neutral-300" />
+              <div className="w-9 h-1 rounded-full bg-neutral-300" />
               </div>
               <div className="px-5 pt-2 pb-4 text-center">
-                <span className="font-semibold text-base">Select Language</span>
+                <span className="font-semibold text-base">{t("onboarding.step2.selectLanguage")}</span>
               </div>
             </div>
 
@@ -110,13 +94,13 @@ function LanguageModal({
               style={{ position: "absolute", top: 76, left: 0, right: 0, bottom: 0 }}
             >
               <div className="flex flex-col gap-1.5">
-                {LANGUAGES.map((lang) => {
-                  const isSelected = selectedLanguage === lang.label;
+                {LANGUAGE_OPTIONS.map((lang) => {
+                  const isSelected = selectedLanguageCode === lang.code;
                   return (
                     <button
                       key={lang.code}
                       onClick={() => {
-                        onSelect(lang.label);
+                        onSelect(lang.code);
                         onClose();
                       }}
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-colors ${isSelected
@@ -146,38 +130,41 @@ function LanguageModal({
 }
 
 export function Step2({ onContinue, formData, setFormData }: BaseStepProps) {
+  const { t } = useI18n();
   const [modalOpen, setModalOpen] = useState(false);
 
-  const selectedLabel = formData.language || "US English";
+  const selectedLanguage =
+    LANGUAGE_OPTIONS.find((opt) => opt.code === formData.language) ??
+    LANGUAGE_OPTIONS[0];
 
   return (
     <>
       <div className="flex flex-col gap-10 px-5">
         <div className="flex flex-col items-center leading-5 gap-1">
-          <span>What&apos;s your preferred language?</span>
-          <span className="text-neutral-400 max-w-xs text-center">Step 2 of 3</span>
+          <span>{t("onboarding.step2.title")}</span>
+          <span className="text-neutral-400 max-w-xs text-center">{t("onboarding.step2.progress")}</span>
         </div>
         <div className="w-full flex flex-col gap-2">
           <button
             onClick={() => setModalOpen(true)}
             className="w-full h-13 flex flex-col font-medium text-sm rounded-full border border-neutral-300 items-center justify-center active:bg-neutral-100 px-4 text-center"
           >
-            <span className="font-semibold">{selectedLabel}</span>
-            <span className="text-neutral-400 text-xs">Tap to change</span>
+            <span className="font-semibold">{selectedLanguage.label}</span>
+            <span className="text-neutral-400 text-xs">{t("onboarding.step2.tapToChange")}</span>
           </button>
           <button
             onClick={onContinue}
             className="w-full h-12 font-semibold text-sm text-white bg-neutral-900 rounded-full flex items-center justify-center active:bg-neutral-700"
           >
-            Continue
+            {t("common.continue")}
           </button>
         </div>
       </div>
       <LanguageModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        selectedLanguage={selectedLabel}
-        onSelect={(label) => setFormData((prev) => ({ ...prev, language: label }))}
+        selectedLanguageCode={selectedLanguage.code}
+        onSelect={(code) => setFormData((prev) => ({ ...prev, language: code }))}
       />
     </>
   );

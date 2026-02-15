@@ -27,8 +27,10 @@ export type ConversationSummaryContent = z.infer<
 // Prompt
 // ---------------------------------------------------------------------------
 
-function buildConversationSummaryPrompt(transcript: string): string {
+function buildConversationSummaryPrompt(transcript: string, languageTag: string): string {
   return `You are a medical documentation specialist. You will receive a raw transcript of a doctor-patient conversation. The transcript does not have speaker labels — your job is to infer who is speaking (the doctor or the patient) based on conversational context and produce a polished, speaker-attributed summary.
+
+Preferred output language: ${languageTag}
 
 ## Task
 
@@ -100,13 +102,14 @@ ${transcript}
  */
 export async function extractConversationSummary(
   transcript: string,
+  languageTag: string = "en-US",
 ): Promise<ConversationSummaryContent> {
   const { output } = await queryLLMStructured({
     name: "ConversationSummary",
     description:
       "Polished, speaker-attributed bullet-point summary of a doctor-patient conversation",
     schema: conversationSummarySchema,
-    prompt: buildConversationSummaryPrompt(transcript),
+    prompt: buildConversationSummaryPrompt(transcript, languageTag),
   });
 
   return output;

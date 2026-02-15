@@ -1,8 +1,8 @@
-export function formatConversationDate(date: Date): string {
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const year = String(date.getFullYear()).slice(-2);
-  return `${month}/${day}/${year}`;
+export function formatConversationDate(
+  date: Date,
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string,
+): string {
+  return formatDate(date, { month: "numeric", day: "numeric", year: "2-digit" });
 }
 
 export function parseDateFromSearchParams(searchParams: URLSearchParams): Date {

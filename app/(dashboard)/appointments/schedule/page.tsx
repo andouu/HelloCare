@@ -1,7 +1,9 @@
 'use client';
+
 import { Spinner } from "@/app/components/Spinner";
+import { useI18n } from "@/app/components/I18nProvider";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HiCheck, HiPhone, HiPhoneMissedCall } from "react-icons/hi";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
@@ -42,34 +44,24 @@ const STATE_STYLES: Record<
   },
 };
 
-const LOADING_TEXTS = [
-  "Flibbertigibbeting...",
-  "Quantumizing...",
-  "Dilly-dallying...",
-  "Bumfuzzling...",
-  "Higgledy-piggledying...",
-  "Skedaddling...",
-  "Lollygagging...",
-];
-
-function IdleState() {
-  return <span className="text-center text-sm max-w-xs">Press the button below to start the scheduling process. This screen will refresh automatically with updates.</span>;
+function IdleState({ text }: { text: string }) {
+  return <span className="text-center text-sm max-w-xs">{text}</span>;
 }
 
-function SchedulingState({ theme }: { theme: StateTheme }) {
+function SchedulingState({ theme, loadingTexts }: { theme: StateTheme; loadingTexts: string[] }) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % LOADING_TEXTS.length);
+      setIndex((i) => (i + 1) % loadingTexts.length);
     }, 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [loadingTexts.length]);
 
   return (
     <div className="flex flex-col gap-4 items-center justify-center">
       <Spinner size="lg" theme={theme} />
-      <span>{LOADING_TEXTS[index]}</span>
+      <span>{loadingTexts[index]}</span>
     </div>
   );
 }
@@ -85,18 +77,24 @@ function AwaitingConfirmationState({
   timeslots,
   onToggleAvailability,
   onProceed,
+  title,
+  subtitle,
+  proceedLabel,
 }: {
   timeslots: Timeslot[];
   onToggleAvailability: (label: string) => void;
   onProceed: () => void;
+  title: string;
+  subtitle: string;
+  proceedLabel: string;
 }) {
   const hasSelection = timeslots.some((s) => s.available);
 
   return (
     <div className="w-full px-5">
       <div className="flex flex-col items-center">
-        <span>We got some time slots!</span>
-        <span className="opacity-50">Do any of these times work for you?</span>
+        <span>{title}</span>
+        <span className="opacity-50">{subtitle}</span>
       </div>
       <div className="w-full flex flex-col gap-2 mt-10">
         {timeslots.slice(0, MAX_TIMESLOTS).map((slot) => (
@@ -104,8 +102,7 @@ function AwaitingConfirmationState({
             key={slot.label}
             type="button"
             onClick={() => onToggleAvailability(slot.label)}
-            className={`relative w-full h-12 border rounded-full flex items-center justify-center cursor-pointer active:opacity-80 transition-opacity ${slot.available ? "bg-white text-neutral-900 border-white" : "border-white"
-              }`}
+            className={`relative w-full h-12 border rounded-full flex items-center justify-center cursor-pointer active:opacity-80 transition-opacity ${slot.available ? "bg-white text-neutral-900 border-white" : "border-white"}`}
           >
             {slot.label}
             {slot.available && (
@@ -120,13 +117,14 @@ function AwaitingConfirmationState({
         onClick={onProceed}
         className={`w-full h-12 mt-10 rounded-full flex items-center justify-center text-white ${hasSelection ? "bg-neutral-900 active:bg-neutral-700" : "bg-neutral-900/40 cursor-not-allowed"}`}
       >
-        Proceed
+        {proceedLabel}
       </button>
     </div>
   );
 }
 
 export default function SchedulePage() {
+  const { t } = useI18n();
   const router = useRouter();
   const { user } = useAuth();
   const [schedulingState, setSchedulingState] = useState<SchedulingStateType>("idle");
@@ -134,6 +132,19 @@ export default function SchedulePage() {
   /* eslint-disable @typescript-eslint/no-unused-vars -- reserved for future implementation */
   const [error, setError] = useState<string | null>(null);
   /* eslint-enable @typescript-eslint/no-unused-vars */
+
+  const loadingTexts = useMemo(
+    () => [
+      t("schedule.loading.1"),
+      t("schedule.loading.2"),
+      t("schedule.loading.3"),
+      t("schedule.loading.4"),
+      t("schedule.loading.5"),
+      t("schedule.loading.6"),
+      t("schedule.loading.7"),
+    ],
+    [t]
+  );
 
   // Subscribe to the SSE timeslot stream while scheduling
   useEffect(() => {
@@ -158,8 +169,6 @@ export default function SchedulePage() {
     const firstName = (result.ok ? result.data?.firstName : "") ?? "";
     const lastName = (result.ok ? result.data?.lastName : "") ?? "";
     const fullName = `${firstName} ${lastName}`.trim();
-
-    console.log("[startVapiCall] Calling");
 
     try {
       const res = await fetch("/api/vapi", {
@@ -206,22 +215,25 @@ export default function SchedulePage() {
   return (
     <div className="w-full h-screen flex flex-col gap-5 p-5">
       <div className="flex flex-col pt-45 gap-2">
-        <span className="text-xl font-bold tracking-tight">Schedule Appointment</span>
-        <span className="text-neutral-400 leading-5">Automatically schedule an appointment with your healthcare provider. We&apos;ll call them, and you confirm the times.</span>
+        <span className="text-xl font-bold tracking-tight">{t("schedule.title")}</span>
+        <span className="text-neutral-400 leading-5">{t("schedule.subtitle")}</span>
       </div>
       <div
         className={`w-full h-full flex flex-col gap-4 items-center justify-center rounded-2xl transition-[background-color] duration-300 ${STATE_STYLES[schedulingState].bg} ${STATE_STYLES[schedulingState].text}`}
       >
         {schedulingState === "scheduling" ? (
-          <SchedulingState theme={STATE_STYLES[schedulingState].theme} />
+          <SchedulingState theme={STATE_STYLES[schedulingState].theme} loadingTexts={loadingTexts} />
         ) : schedulingState === "awaiting_confirmation" ? (
           <AwaitingConfirmationState
             timeslots={timeslots}
             onToggleAvailability={handleToggleAvailability}
             onProceed={handleProceed}
+            title={t("schedule.slotsTitle")}
+            subtitle={t("schedule.slotsSubtitle")}
+            proceedLabel={t("schedule.proceed")}
           />
         ) : (
-          <IdleState />
+          <IdleState text={t("schedule.idle")} />
         )}
       </div>
       <div className="pb-15 flex flex-col gap-3">
@@ -245,17 +257,17 @@ export default function SchedulePage() {
           {schedulingState === "idle" ? <HiPhone className="w-4 h-4" /> : <HiPhoneMissedCall className="w-4 h-4" />}
           <span className="flex-1">
             {schedulingState === "idle"
-              ? "Start Scheduling Process"
+              ? t("schedule.start")
               : schedulingState === "completed"
-                ? "Start Process Again"
-                : "Stop Scheduling Process"}
+                ? t("schedule.startAgain")
+                : t("schedule.stop")}
           </span>
         </button>
         <button
           onClick={() => router.push("/")}
           className="w-full h-12 text-sm text-neutral-900 rounded-full flex items-center justify-center px-5 bg-neutral-300 active:bg-neutral-400"
         >
-          Back to Home
+          {t("schedule.backHome")}
         </button>
       </div>
     </div>

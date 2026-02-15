@@ -6,8 +6,9 @@ import { HiOutlineMenuAlt4 } from "react-icons/hi";
 import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { motion } from "motion/react";
 import { useChat } from "@ai-sdk/react";
+import { useI18n } from "@/app/components/I18nProvider";
 import { ChatWidget, HomeSummary, StreamingText } from "@/app/components";
-import { SUGGESTED_PROMPTS } from "@/app/components/HomeSummary";
+import { getSuggestedPrompts } from "@/app/components/HomeSummary";
 import { useDrawer } from "@/app/(dashboard)/layout";
 import { useAppointments, useUserMetadata, useUserData } from "@/lib/firestore";
 import type { UIMessage } from "ai";
@@ -22,6 +23,7 @@ function getMessageText(msg: UIMessage): string {
 }
 
 export default function Home() {
+  const { t, languageTag } = useI18n();
   const { loading, isOnboarded, data: userMetadata } = useUserMetadata();
   const userData = useUserData();
   const { appointments } = useAppointments();
@@ -47,6 +49,7 @@ export default function Home() {
             preferredLanguage: userMetadata.preferredLanguage,
           }
         : null,
+      languageTag,
       healthNotes: userData.healthNotes.map((n) => ({
         id: n.id,
         date: n.date instanceof Date ? n.date.toISOString() : n.date,
@@ -80,6 +83,7 @@ export default function Home() {
     }),
     [
       userMetadata,
+      languageTag,
       userData.healthNotes,
       userData.actionItems,
       userData.sessionMetadata,
@@ -104,8 +108,9 @@ export default function Home() {
     [sendMessage, chatContext]
   );
 
+  const suggestedPrompts = getSuggestedPrompts(t);
   const currentSuggestedPrompt =
-    SUGGESTED_PROMPTS[suggestedPromptIndex % SUGGESTED_PROMPTS.length];
+    suggestedPrompts[suggestedPromptIndex % suggestedPrompts.length];
   const handlePromptClick = useCallback(
     (text: string) => {
       handleSend(text);
@@ -163,7 +168,7 @@ export default function Home() {
           type="button"
           onClick={() => openDrawer?.()}
           className="p-2 -ml-2 rounded-lg text-neutral-900 hover:bg-neutral-100 transition-colors"
-          aria-label="Open menu"
+          aria-label={t("home.openMenu")}
         >
           <HiOutlineMenuAlt4 className="w-6 h-6" />
         </button>
@@ -173,7 +178,7 @@ export default function Home() {
           className="flex items-center gap-2 rounded-full bg-neutral-200 px-4 py-2.5 text-sm text-neutral-900 transition-colors hover:bg-neutral-300"
         >
           <HiOutlineChatBubbleLeftRight className="h-5 w-5 shrink-0" />
-          <span>I&apos;m at a doctor&apos;s visit</span>
+          <span>{t("home.visitCta")}</span>
         </button>
       </header>
       <div
@@ -226,7 +231,7 @@ export default function Home() {
                 className="flex justify-start"
               >
                 <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-neutral-100 text-neutral-500">
-                  Thinking…
+                  {t("home.thinking")}
                 </div>
               </motion.div>
             )}

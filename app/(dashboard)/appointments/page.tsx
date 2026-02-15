@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
+import { useI18n } from "@/app/components/I18nProvider";
 import { Spinner } from "@/app/components/Spinner";
 import { Toast } from "@/app/components/Toast";
 import { useDrawer } from "@/app/(dashboard)/layout";
@@ -10,38 +11,34 @@ import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import { deleteAppointment, useAppointments } from "@/lib/firestore";
 import type { Appointment } from "@/lib/firestore";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 const MS_PER_WEEK = 7 * MS_PER_DAY;
 
-/** Format as date and time (e.g. Jan 15, 2025, 2:30 PM). */
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 type TimeUntil = { label: string; pillClass: string };
 
-function getTimeUntil(appointmentTime: Date): TimeUntil {
+function getTimeUntil(
+  appointmentTime: Date,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): TimeUntil {
   const now = Date.now();
-  const t = appointmentTime.getTime();
-  const diff = t - now;
+  const tMs = appointmentTime.getTime();
+  const diff = tMs - now;
 
   if (diff <= 0) {
     const ago = Math.abs(diff);
-    if (ago < MS_PER_HOUR) return { label: "Just passed", pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
-    if (ago < MS_PER_DAY) return { label: `${Math.floor(ago / MS_PER_HOUR)}h ago`, pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
-    if (ago < MS_PER_WEEK) return { label: `${Math.floor(ago / MS_PER_DAY)}d ago`, pillClass: "bg-neutral-100 text-neutral-500 border-neutral-200" };
-    return { label: "Passed", pillClass: "bg-neutral-100 text-neutral-400 border-neutral-200" };
+    if (ago < MS_PER_HOUR) return { label: t("time.justPassed"), pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+    if (ago < MS_PER_DAY) return { label: t("time.hoursAgo", { count: Math.floor(ago / MS_PER_HOUR) }), pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+    if (ago < MS_PER_WEEK) return { label: t("time.daysAgo", { count: Math.floor(ago / MS_PER_DAY) }), pillClass: "bg-neutral-100 text-neutral-500 border-neutral-200" };
+    return { label: t("time.passed"), pillClass: "bg-neutral-100 text-neutral-400 border-neutral-200" };
   }
 
-  if (diff < MS_PER_HOUR) return { label: "In < 1 hour", pillClass: "bg-rose-100 text-rose-800 border-rose-200" };
-  if (diff < MS_PER_DAY) return { label: `In ${Math.ceil(diff / MS_PER_HOUR)}h`, pillClass: "bg-rose-50 text-rose-700 border-rose-200" };
-  if (diff < MS_PER_WEEK) return { label: `In ${Math.ceil(diff / MS_PER_DAY)} days`, pillClass: "bg-amber-50 text-amber-800 border-amber-200" };
-  return { label: `In ${Math.ceil(diff / MS_PER_DAY)} days`, pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+  if (diff < MS_PER_HOUR) return { label: t("time.inLessThanHour"), pillClass: "bg-rose-100 text-rose-800 border-rose-200" };
+  if (diff < MS_PER_DAY) return { label: t("time.inHours", { count: Math.ceil(diff / MS_PER_HOUR) }), pillClass: "bg-rose-50 text-rose-700 border-rose-200" };
+  if (diff < MS_PER_WEEK) return { label: t("time.inDays", { count: Math.ceil(diff / MS_PER_DAY) }), pillClass: "bg-amber-50 text-amber-800 border-amber-200" };
+  return { label: t("time.inDays", { count: Math.ceil(diff / MS_PER_DAY) }), pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
 }
 
 /** Sort by closest to current time: soonest upcoming first, then later upcoming, then past (most recent first). */
@@ -64,13 +61,17 @@ const HIGHLIGHT_CLASS = "ring-2 ring-blue-500 ring-offset-2";
 function AppointmentCard({
   appointment,
   highlight,
+  formatDate,
+  t,
   onDelete,
 }: {
   appointment: Appointment;
   highlight: boolean;
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   onDelete: (id: string) => void;
 }) {
-  const { label, pillClass } = getTimeUntil(appointment.appointmentTime);
+  const { label, pillClass } = getTimeUntil(appointment.appointmentTime, t);
   return (
     <article
       id={`appointment-${appointment.id}`}
@@ -81,7 +82,7 @@ function AppointmentCard({
         type="button"
         onClick={() => onDelete(appointment.id)}
         className="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-        aria-label="Delete appointment"
+        aria-label={t("appointments.deleteAria")}
       >
         <HiOutlineTrash className="w-4 h-4" />
       </button>
@@ -93,44 +94,51 @@ function AppointmentCard({
             {label}
           </span>
           <h3 className="text-base font-semibold text-neutral-900">
-            {formatDateTime(appointment.appointmentTime)}
+            {formatDate(appointment.appointmentTime, { dateStyle: "medium", timeStyle: "short" })}
           </h3>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
-          <span>Scheduled at: {formatDateTime(appointment.scheduledOn)}</span>
+          <span>{t("appointments.scheduledAt", { date: formatDate(appointment.scheduledOn, { dateStyle: "medium", timeStyle: "short" }) })}</span>
         </div>
       </div>
     </article>
   );
 }
 
-function EmptyState() {
+function EmptyState({ t }: { t: (key: MessageKey, vars?: Record<string, string | number>) => string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/50 py-12 px-6 text-center">
-      <p className="text-sm font-medium text-neutral-600">No appointments yet</p>
+      <p className="text-sm font-medium text-neutral-600">{t("appointments.emptyTitle")}</p>
       <p className="text-xs text-neutral-500 max-w-xs">
-        Your scheduled appointments will show up here. Schedule via the
-        conversation or schedule flow.
+        {t("appointments.emptyBody")}
       </p>
     </div>
   );
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({
+  message,
+  t,
+}: {
+  message: string;
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
+}) {
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-center">
-      <p className="text-sm font-medium text-rose-800">Something went wrong</p>
+      <p className="text-sm font-medium text-rose-800">{t("common.somethingWentWrong")}</p>
       <p className="mt-1 text-xs text-rose-700">{message}</p>
     </div>
   );
 }
 
 export default function AppointmentsPage() {
+  const { t, formatDate } = useI18n();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const { appointments, loading, error } = useAppointments();
   const { openDrawer } = useDrawer() ?? {};
   const { user } = useAuth();
+  const uid = user?.uid;
   const [operationError, setOperationError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -144,16 +152,16 @@ export default function AppointmentsPage() {
 
   const handleDelete = useCallback(
     async (appointmentId: string) => {
-      if (!user?.uid) return;
+      if (!uid) return;
       setOperationError(null);
-      const result = await deleteAppointment(db, user.uid, appointmentId);
+      const result = await deleteAppointment(db, uid, appointmentId);
       if (result.ok) {
-        setToastMessage("Deleted");
+        setToastMessage(t("common.deleted"));
       } else {
         setOperationError(result.error.message);
       }
     },
-    [user?.uid]
+    [uid, t]
   );
 
   const dismissToast = useCallback(() => setToastMessage(null), []);
@@ -175,16 +183,16 @@ export default function AppointmentsPage() {
           type="button"
           onClick={() => openDrawer?.()}
           className="p-2 -ml-2 rounded-lg text-neutral-900 hover:bg-neutral-100 transition-colors"
-          aria-label="Open menu"
+          aria-label={t("home.openMenu")}
         >
           <HiOutlineMenuAlt4 className="w-6 h-6" />
         </button>
-        <h1 className="text-lg font-semibold text-neutral-900">Appointments</h1>
+        <h1 className="text-lg font-semibold text-neutral-900">{t("appointments.title")}</h1>
         <div className="w-10" aria-hidden />
       </header>
       <div className="flex-1 flex flex-col gap-6 p-4 overflow-auto">
         <p className="text-sm text-neutral-500">
-          Your scheduled appointments, updated in real time.
+          {t("appointments.subtitle")}
         </p>
 
         {operationError && (
@@ -197,14 +205,14 @@ export default function AppointmentsPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
             <Spinner size="lg" theme="neutral" />
             <span className="text-sm text-neutral-500">
-              Loading appointments…
+              {t("appointments.loading")}
             </span>
           </div>
         )}
 
-        {!loading && error && <ErrorState message={error.message} />}
+        {!loading && error && <ErrorState message={error.message} t={t} />}
 
-        {!loading && !error && appointments.length === 0 && <EmptyState />}
+        {!loading && !error && appointments.length === 0 && <EmptyState t={t} />}
 
         {!loading && !error && sortedAppointments.length > 0 && (
           <ul className="flex flex-col gap-3 list-none p-0 m-0">
@@ -213,6 +221,8 @@ export default function AppointmentsPage() {
                 <AppointmentCard
                   appointment={appointment}
                   highlight={highlightId === appointment.id}
+                  formatDate={formatDate}
+                  t={t}
                   onDelete={handleDelete}
                 />
               </li>

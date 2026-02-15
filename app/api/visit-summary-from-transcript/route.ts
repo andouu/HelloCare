@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveLanguageTag } from "@/lib/i18n/locales";
 import {
   extractVisitSummaryFromTranscript,
   type ActionItemOutput,
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     const { transcript, visitDate } = body as {
       transcript: string;
       visitDate?: string;
+      languageTag?: string;
     };
 
     if (!transcript || typeof transcript !== "string") {
@@ -57,7 +59,11 @@ export async function POST(req: Request) {
     }
 
     const dateStr = visitDate ?? new Date().toISOString().split("T")[0];
-    const result = await extractVisitSummaryFromTranscript(transcript, dateStr);
+    const result = await extractVisitSummaryFromTranscript(
+      transcript,
+      dateStr,
+      resolveLanguageTag(body.languageTag),
+    );
 
     if (result.status === "NOT_ENOUGH_DATA") {
       return NextResponse.json({ notEnoughData: true });

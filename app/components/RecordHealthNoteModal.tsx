@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
+import { useI18n } from "@/app/components/I18nProvider";
 import { useStreamingTranscription } from "@/app/hooks/useStreamingTranscription";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
@@ -14,7 +15,11 @@ import type { HealthNote } from "@/lib/firestore/types";
 const DISMISS_THRESHOLD = 100;
 const WAVEFORM_BARS = 40;
 
-function formatRelativeDate(date: Date, now: Date = new Date()): string {
+function formatRelativeDate(
+  date: Date,
+  languageTag: string,
+  now: Date = new Date(),
+): string {
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
@@ -23,14 +28,17 @@ function formatRelativeDate(date: Date, now: Date = new Date()): string {
   const diffWeek = Math.floor(diffDay / 7);
   const diffMonth = Math.floor(diffDay / 30);
   const diffYear = Math.floor(diffDay / 365);
+  const formatter = new Intl.RelativeTimeFormat(languageTag, {
+    numeric: "auto",
+  });
 
-  if (diffSec < 60) return "Just now";
-  if (diffMin < 60) return `${diffMin} Minute${diffMin !== 1 ? "s" : ""} Ago`;
-  if (diffHr < 24) return `${diffHr} Hour${diffHr !== 1 ? "s" : ""} Ago`;
-  if (diffDay < 7) return `${diffDay} Day${diffDay !== 1 ? "s" : ""} Ago`;
-  if (diffWeek < 4) return `${diffWeek} Week${diffWeek !== 1 ? "s" : ""} Ago`;
-  if (diffMonth < 12) return `${diffMonth} Month${diffMonth !== 1 ? "s" : ""} Ago`;
-  return `${diffYear} Year${diffYear !== 1 ? "s" : ""} Ago`;
+  if (diffSec < 60) return formatter.format(-diffSec, "second");
+  if (diffMin < 60) return formatter.format(-diffMin, "minute");
+  if (diffHr < 24) return formatter.format(-diffHr, "hour");
+  if (diffDay < 7) return formatter.format(-diffDay, "day");
+  if (diffWeek < 4) return formatter.format(-diffWeek, "week");
+  if (diffMonth < 12) return formatter.format(-diffMonth, "month");
+  return formatter.format(-diffYear, "year");
 }
 
 function formatDuration(ms: number): string {
@@ -48,13 +56,16 @@ const NOISE_FLOOR = 0.03;
 
 function RecordingWaveform({ level }: { level: number }) {
   const levelRef = useRef(level);
-  levelRef.current = level;
-  const barStartRef = useRef(performance.now());
+  const barStartRef = useRef(0);
   const smoothedRef = useRef(MIN_BAR_HEIGHT);
   const [heights, setHeights] = useState<number[]>(
     () => Array.from({ length: WAVEFORM_BARS }, () => MIN_BAR_HEIGHT)
   );
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    levelRef.current = level;
+  }, [level]);
 
   useEffect(() => {
     let raf: number;
@@ -133,6 +144,7 @@ export function RecordHealthNoteModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const { t, languageTag } = useI18n();
   const dragY = useMotionValue(0);
   const backdropOpacity = useTransform(dragY, [0, 400], [0.4, 0]);
   const backdropColor = useTransform(backdropOpacity, (v) => `rgba(0,0,0,${v})`);
@@ -172,11 +184,10 @@ export function RecordHealthNoteModal({
     isRecording,
     isStarting,
     isStopping,
-    segments,
-    interimTranscript,
     isSupported,
     tokenStatus,
   } = useStreamingTranscription({
+    languageTag,
     onAudioLevel: useCallback((level: number) => setAudioLevel(level), []),
   });
 
@@ -225,9 +236,9 @@ export function RecordHealthNoteModal({
         const res = await fetch("/api/health-note-from-transcript", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(processingPayload),
+          body: JSON.stringify({ ...processingPayload, languageTag }),
         });
-        if (!res.ok) throw new Error("Failed to generate health note");
+        if (!res.ok) throw new Error(t("recordNote.generateFailed"));
         const data = (await res.json()) as
           | (HealthNote & { date: string; startedAt: string; endedAt: string })
           | { notEnoughData: true };
@@ -250,14 +261,14 @@ export function RecordHealthNoteModal({
         }
       } catch (err) {
         if (!cancelled) {
-          setProcessingError(err instanceof Error ? err.message : "Failed to generate health note");
+          setProcessingError(err instanceof Error ? err.message : t("recordNote.generateFailed"));
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [screen, processingPayload]);
+  }, [screen, processingPayload, languageTag, t]);
 
   const handleRetry = useCallback(() => {
     setScreen("record");
@@ -363,13 +374,13 @@ export function RecordHealthNoteModal({
                           onClick={handleRetry}
                           className="text-sm font-medium text-neutral-700 underline"
                         >
-                          Retry
+                          {t("common.retry")}
                         </button>
                       </>
                     ) : (
                       <>
                         <Spinner size="lg" theme="neutral" />
-                        <span className="text-sm text-neutral-500">Processing your recording…</span>
+                        <span className="text-sm text-neutral-500">{t("recordNote.processing")}</span>
                       </>
                     )}
                   </motion.div>
@@ -382,16 +393,16 @@ export function RecordHealthNoteModal({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <span className="font-bold">Not Enough Data</span>
+                    <span className="font-bold">{t("recordNote.notEnoughTitle")}</span>
                     <p className="text text-neutral-500 text-center">
-                      We couldn&apos;t extract enough information from your recording. Try speaking more clearly or for a bit longer about your health concern.
+                      {t("recordNote.notEnoughBody")}
                     </p>
                     <button
                       type="button"
                       onClick={handleRetry}
                       className="h-12 mt-8 px-8 font-semibold text-sm rounded-full bg-neutral-900 text-white hover:bg-neutral-800 active:bg-neutral-700 flex items-center justify-center gap-2"
                     >
-                      Retry recording
+                      {t("recordNote.retryRecording")}
                     </button>
                   </motion.div>
                 ) : screen === "complete" && healthNote ? (
@@ -412,9 +423,9 @@ export function RecordHealthNoteModal({
                           <h3 className="text-lg font-bold text-neutral-900">{healthNote.title}</h3>
                         </div>
                         <div className="text-sm text-neutral-500">
-                          {formatRelativeDate(healthNote.startedAt)}
+                          {formatRelativeDate(healthNote.startedAt, languageTag)}
                           {healthNote.startedAt.getTime() !== healthNote.endedAt.getTime() && (
-                            <> · {formatDuration(healthNote.endedAt.getTime() - healthNote.startedAt.getTime())} Recording</>
+                            <> · {formatDuration(healthNote.endedAt.getTime() - healthNote.startedAt.getTime())} {t("recordNote.recordingSuffix")}</>
                           )}
                         </div>
                         <p className="text text-neutral-600 whitespace-pre-wrap">{healthNote.description}</p>
@@ -428,7 +439,7 @@ export function RecordHealthNoteModal({
                         className="flex-1 h-12 font-semibold text-sm rounded-full border border-neutral-300 text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <HiOutlineThumbDown size={18} />
-                        Retry recording
+                        {t("recordNote.retryRecording")}
                       </button>
                       <button
                         type="button"
@@ -437,7 +448,7 @@ export function RecordHealthNoteModal({
                         className="flex-1 h-12 font-semibold text-sm rounded-full bg-neutral-900 text-white hover:bg-neutral-800 active:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {writing ? <Spinner size="sm" theme="amber" /> : <HiDownload size={18} />}
-                        Save note
+                        {t("recordNote.saveNote")}
                       </button>
                     </div>
                     {writeError && (
@@ -454,9 +465,9 @@ export function RecordHealthNoteModal({
                     transition={{ duration: 0.25 }}
                   >
                     <div className="flex flex-col items-center gap-2">
-                      <span className="font-bold">Record Health Note</span>
+                      <span className="font-bold">{t("recordNote.title")}</span>
                       <span className="text-neutral-400">
-                        Record health incidents you&apos;re experiencing, and we&apos;ll use this information to help you.
+                        {t("recordNote.subtitle")}
                       </span>
                     </div>
                     <div className="flex-1 flex flex-col items-center justify-center py-8 gap-3">
@@ -481,11 +492,11 @@ export function RecordHealthNoteModal({
                           : "bg-neutral-900 text-white active:bg-neutral-700"
                           }`}
                         aria-pressed={isRecording}
-                        aria-label={isRecording ? (isStopping ? "Stopping…" : "Stop recording") : isStarting ? "Starting…" : "Start recording"}
+                        aria-label={isRecording ? t("chatWidget.stopRecording") : t("chatWidget.startRecording")}
                       >
                         {isRecording ? <HiStop size={20} /> : <HiMicrophone size={20} />}
                         <span className="flex-1 text-center flex items-center justify-center gap-2">
-                          {isStarting || isStopping ? <Spinner size="sm" theme="amber" /> : isRecording ? "Stop Recording" : "Start Recording"}
+                          {isStarting || isStopping ? <Spinner size="sm" theme="amber" /> : isRecording ? t("recordNote.stop") : t("recordNote.start")}
                         </span>
                       </button>
                     </div>

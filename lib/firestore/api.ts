@@ -24,6 +24,7 @@ import {
   type UserSubcollectionKey,
 } from "./collections";
 import { toFirestoreValue } from "./serialize";
+import { DEFAULT_LANGUAGE_TAG, resolveLanguageTag } from "@/lib/i18n/locales";
 import type {
   ActionItem,
   Appointment,
@@ -50,7 +51,10 @@ function snapshotToUserMetadata(snap: DocumentSnapshot): UserMetadata | null {
     email: typeof data.email === "string" ? data.email : undefined,
     firstName: typeof data.firstName === "string" ? data.firstName : "",
     lastName: typeof data.lastName === "string" ? data.lastName : "",
-    preferredLanguage: typeof data.preferredLanguage === "string" ? data.preferredLanguage : undefined,
+    preferredLanguage:
+      typeof data.preferredLanguage === "string"
+        ? resolveLanguageTag(data.preferredLanguage)
+        : undefined,
     hospitalPhoneNumber: typeof data.hospitalPhoneNumber === "string" ? data.hospitalPhoneNumber : undefined,
   };
 }
@@ -88,7 +92,7 @@ export async function writeUserMetadata(
       email: payload.email ?? "",
       firstName: payload.firstName ?? "",
       lastName: payload.lastName ?? "",
-      preferredLanguage: payload.preferredLanguage ?? "en",
+      preferredLanguage: resolveLanguageTag(payload.preferredLanguage ?? DEFAULT_LANGUAGE_TAG),
       hospitalPhoneNumber: payload.hospitalPhoneNumber ?? "",
       createDate: Timestamp.now(),
     };

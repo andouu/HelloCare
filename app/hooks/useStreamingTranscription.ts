@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   StreamingTranscriber,
+  StreamingSpeechModel,
   TurnEvent,
 } from "assemblyai";
 import {
   STREAMING_KEYTERMS_MEDICATIONS,
   STREAMING_KEYTERMS_MEDICAL_TERMS,
 } from "@/lib/assemblyai/keyterms";
+import { resolveLanguageTag } from "@/lib/i18n";
 import { debugLog } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
@@ -21,8 +23,9 @@ export interface Segment {
 }
 
 export interface UseStreamingTranscriptionOptions {
-  /** BCP-47 language tag – currently unused by AssemblyAI streaming but kept
-   *  for forward-compatibility with future multi-language support. */
+  /** BCP-47 language tag from user preferences (for STT model selection). */
+  languageTag?: string;
+  /** @deprecated Use `languageTag`. */
   language?: string;
   /** Called with RMS audio level (0–1) during recording for visualization. */
   onAudioLevel?: (level: number) => void;
@@ -72,6 +75,8 @@ export function useStreamingTranscription(
 ): UseStreamingTranscriptionReturn {
   const onAudioLevelRef = useRef(options?.onAudioLevel);
   onAudioLevelRef.current = options?.onAudioLevel;
+  const languageTagRef = useRef(options?.languageTag ?? options?.language);
+  languageTagRef.current = options?.languageTag ?? options?.language;
   // ---- state ---------------------------------------------------------------
   const [isRecording, setIsRecording] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -239,13 +244,22 @@ export function useStreamingTranscription(
       committedTurnOrdersRef.current.clear();
       transcriptRef.current = { segments: [], interim: "" };
       const turnDetection = turnDetectionRef.current;
-      const keytermsEnabled = keytermsEnabledRef.current;
+      const preferredLanguageTag = resolveLanguageTag(languageTagRef.current);
+      const isLikelyEnglish = preferredLanguageTag.toLowerCase().startsWith("en");
+      const keytermsEnabled = keytermsEnabledRef.current && isLikelyEnglish;
+      const speechModel: StreamingSpeechModel = "universal-streaming-multilingual";
+      const languageDetection = true;
       debugLog("Key terms are enabled:" + keytermsEnabled);
+      debugLog(
+        `[AssemblyAI] streaming model=${speechModel}, languageDetection=${String(languageDetection)}, preferredLanguage=${preferredLanguageTag}`,
+      );
 
       const transcriber = new ST({
         sampleRate: actualSampleRate,
         formatTurns: true,
         token: tokenRef.current,
+        speechModel,
+        languageDetection,
         ...(keytermsEnabled && {
           keytermsPrompt: [
             ...STREAMING_KEYTERMS_MEDICATIONS,

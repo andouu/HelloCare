@@ -26,6 +26,7 @@ export interface ConversationViewPropsMap {
   };
   summary: {
     segments: string[];
+    languageTag: string;
     onMarkCorrect: () => void;
     onMarkIncorrect: () => void;
   };
@@ -42,6 +43,7 @@ export interface ConversationViewPropsMap {
     segments: string[];
     dateLabel: string;
     appointmentDate: Date;
+    languageTag: string;
     onGoHome: () => void;
   };
 }

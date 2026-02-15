@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveLanguageTag } from "@/lib/i18n/locales";
 import type { HealthNoteCreate } from "@/lib/firestore/types";
 import { extractHealthNoteFromTranscript } from "@/lib/llm/queries/health-note";
 
@@ -9,6 +10,7 @@ export async function POST(req: Request) {
       transcript: string;
       startedAt: string;
       endedAt: string;
+      languageTag?: string;
     };
 
     if (!transcript || typeof transcript !== "string") {
@@ -23,7 +25,10 @@ export async function POST(req: Request) {
     const start = startedAt ?? new Date().toISOString();
     const end = endedAt ?? new Date().toISOString();
 
-    const output = await extractHealthNoteFromTranscript(transcript);
+    const output = await extractHealthNoteFromTranscript(
+      transcript,
+      resolveLanguageTag(body.languageTag),
+    );
 
     if (output.status === "NOT_ENOUGH_DATA") {
       return NextResponse.json({ notEnoughData: true });

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { resolveLanguageTag } from "@/lib/i18n/locales";
 import { extractConversationSummary } from "@/lib/llm/queries/conversation-summary";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { transcript } = body as { transcript: string };
+    const { transcript, languageTag } = body as { transcript: string; languageTag?: string };
 
     if (!transcript || typeof transcript !== "string") {
       return NextResponse.json(
@@ -13,7 +14,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await extractConversationSummary(transcript);
+    const result = await extractConversationSummary(
+      transcript,
+      resolveLanguageTag(languageTag),
+    );
 
     if (result.status === "NOT_ENOUGH_DATA") {
       return NextResponse.json({ notEnoughData: true });

@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TbArrowBackUp, TbUpload, TbLoader2, TbCheck, TbAlertTriangle } from "react-icons/tb";
+import { useI18n } from "@/app/components/I18nProvider";
 import { useSaveEntry } from "@/lib/firestore/hooks";
 import { sortActionItemsByPriorityAndDueDate } from "@/lib/firestore";
 import type { ActionItem, ActionItemCreate, ActionItemSerialized } from "@/lib/firestore/types";
+import type { MessageKey } from "@/lib/i18n/messages";
 import type { ConversationViewPropsMap } from "../types";
 
 type Props = ConversationViewPropsMap["visitSummary"];
@@ -91,12 +93,15 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
-/** Format due date in UTC so calendar date matches LLM (e.g. "June 1" stays June 1). */
-function formatDueDate(iso: string | null): string {
-  if (!iso) return "No due date";
+function formatDueDate(
+  iso: string | null,
+  formatDateUTC: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): string {
+  if (!iso) return t("visitSummary.noDueDate");
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "No due date";
-  return d.toLocaleDateString("en-US", {
+  if (Number.isNaN(d.getTime())) return t("visitSummary.noDueDate");
+  return formatDateUTC(d, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -104,7 +109,15 @@ function formatDueDate(iso: string | null): string {
   });
 }
 
-function ActionItemCard({ item }: { item: ActionItemSerialized }) {
+function ActionItemCard({
+  item,
+  formatDateUTC,
+  t,
+}: {
+  item: ActionItemSerialized;
+  formatDateUTC: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
+}) {
   const hasMed =
     item.medication && item.medication.name && item.medication.name !== "N/A";
 
@@ -126,7 +139,7 @@ function ActionItemCard({ item }: { item: ActionItemSerialized }) {
         {item.recurrence && item.recurrence !== "N/A" && (
           <span>&middot; {item.recurrence}</span>
         )}
-        <span>&middot; {formatDueDate(item.dueBy)}</span>
+        <span>&middot; {formatDueDate(item.dueBy, formatDateUTC, t)}</span>
       </div>
 
       {hasMed && item.medication && (
@@ -150,12 +163,12 @@ function ActionItemCard({ item }: { item: ActionItemSerialized }) {
   );
 }
 
-function LoadingSkeleton() {
+function LoadingSkeleton({ t }: { t: (key: MessageKey, vars?: Record<string, string | number>) => string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-12">
       <TbLoader2 className="w-6 h-6 text-neutral-400 animate-spin" />
       <p className="text-sm text-neutral-400">
-        Analyzing your conversation...
+        {t("visitSummary.analyzing")}
       </p>
     </div>
   );
@@ -169,8 +182,10 @@ export function VisitSummaryView({
   segments,
   dateLabel,
   appointmentDate,
+  languageTag,
   onGoHome,
 }: Props) {
+  const { t, formatDateUTC } = useI18n();
   const [state, setState] = useState<SummaryState>({ status: "loading" });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const { save } = useSaveEntry();
@@ -231,6 +246,7 @@ export function VisitSummaryView({
       body: JSON.stringify({
         transcript,
         visitDate: appointmentDate.toISOString().split("T")[0],
+        languageTag,
       }),
       signal: controller.signal,
     })
@@ -256,7 +272,7 @@ export function VisitSummaryView({
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [languageTag]);
 
   // ---- Rendering ----
 
@@ -266,7 +282,7 @@ export function VisitSummaryView({
     return (
       <ul className="list-disc list-inside flex flex-col gap-1">
         {topics.length === 0 ? (
-          <li className="text-sm text-neutral-500">No topics captured.</li>
+          <li className="text-sm text-neutral-500">{t("visitSummary.noTopics")}</li>
         ) : (
           topics.map((text, i) => (
             <li key={i} className="text-sm font-semibold text-neutral-900">
@@ -283,12 +299,12 @@ export function VisitSummaryView({
     const items = sortActionItemsByPriorityAndDueDate(state.actionItems);
     return items.length === 0 ? (
       <p className="text-sm text-neutral-500">
-        No action items were identified.
+        {t("visitSummary.noActionItems")}
       </p>
     ) : (
       <ul className="flex flex-col gap-3">
         {items.map((item) => (
-          <ActionItemCard key={item.id} item={item} />
+          <ActionItemCard key={item.id} item={item} formatDateUTC={formatDateUTC} t={t} />
         ))}
       </ul>
     );
@@ -297,18 +313,18 @@ export function VisitSummaryView({
   const renderContent = () => {
     switch (state.status) {
       case "loading":
-        return <LoadingSkeleton />;
+        return <LoadingSkeleton t={t} />;
 
       case "notEnoughData":
         return (
           <Section
-            title="Discussion Topics"
-            description="These are the things you discussed with your healthcare provider."
+            title={t("visitSummary.discussionTitle")}
+            description={t("visitSummary.discussionDesc")}
           >
             <ul className="list-disc list-inside flex flex-col gap-1">
               {segments.length === 0 ? (
                 <li className="text-sm text-neutral-500">
-                  No topics captured.
+                  {t("visitSummary.noTopics")}
                 </li>
               ) : (
                 segments.map((text, i) => (
@@ -329,13 +345,12 @@ export function VisitSummaryView({
           <>
             <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-6">
               <p className="text-sm text-red-700">
-                Something went wrong while analyzing the conversation. Showing
-                raw transcript below.
+                {t("visitSummary.errorFallback")}
               </p>
             </div>
             <Section
-              title="Discussion Topics"
-              description="These are the things you discussed with your healthcare provider."
+              title={t("visitSummary.discussionTitle")}
+              description={t("visitSummary.discussionDesc")}
             >
               <ul className="list-disc list-inside flex flex-col gap-1">
                 {segments.map((text, i) => (
@@ -355,33 +370,33 @@ export function VisitSummaryView({
         return (
           <>
             <Section
-              title="Discussion Topics"
-              description="These are the things you discussed with your healthcare provider."
+              title={t("visitSummary.discussionTitle")}
+              description={t("visitSummary.discussionDesc")}
             >
               {renderDiscussionTopics()}
             </Section>
 
             <Section
-              title="Action Items"
-              description="These are the things you need to do after your visit. Don&apos;t worry, we&apos;ve saved them for you and your caretakers!"
+              title={t("visitSummary.actionItemsTitle")}
+              description={t("visitSummary.actionItemsDesc")}
             >
               {renderActionItems()}
               {saveStatus === "saving" && (
                 <div className="flex items-center gap-2 mt-3 text-xs text-neutral-400">
                   <TbLoader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving to your account...</span>
+                  <span>{t("visitSummary.saving")}</span>
                 </div>
               )}
               {saveStatus === "saved" && (
                 <div className="flex items-center gap-2 mt-3 text-xs text-green-600">
                   <TbCheck className="w-3.5 h-3.5" />
-                  <span>Saved to your account</span>
+                  <span>{t("visitSummary.saved")}</span>
                 </div>
               )}
               {saveStatus === "error" && (
                 <div className="flex items-center gap-2 mt-3 text-xs text-amber-600">
                   <TbAlertTriangle className="w-3.5 h-3.5" />
-                  <span>Some items could not be saved. They&apos;ll still appear here.</span>
+                  <span>{t("visitSummary.saveWarning")}</span>
                 </div>
               )}
             </Section>
@@ -395,9 +410,9 @@ export function VisitSummaryView({
       {/* Header + content */}
       <div className="flex-1 min-h-0 flex flex-col overflow-auto bg-white">
         <header className="shrink-0 pt-20 px-5 pb-8 bg-white">
-          <h1 className="text-2xl font-bold tracking-tight">Visit Summary</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("visitSummary.title")}</h1>
           <span className="text-neutral-400 text-sm mt-2 block">
-            You visited the doctor on {dateLabel}
+            {t("visitSummary.subtitle", { date: dateLabel })}
           </span>
         </header>
 
@@ -408,15 +423,15 @@ export function VisitSummaryView({
           {/* Post Visit Packet — always shown */}
           {state.status !== "loading" && (
             <Section
-              title="Post Visit Packet"
-              description="Did you get a post-visit information packet? Upload pictures of it here or ask your caretaker to. It&apos;s incredibly helpful!"
+              title={t("visitSummary.postVisitTitle")}
+              description={t("visitSummary.postVisitDesc")}
             >
               <button
                 type="button"
                 className="h-12 rounded-full border border-neutral-300 text-neutral-900 text-sm flex items-center px-5 active:bg-neutral-100 transition-colors"
               >
                 <TbUpload className="w-5 h-5 shrink-0" aria-hidden />
-                <span className="flex-1 text-center px-4">Upload Packet</span>
+                <span className="flex-1 text-center px-4">{t("visitSummary.uploadPacket")}</span>
                 <span className="w-5 shrink-0" aria-hidden />
               </button>
             </Section>
@@ -432,7 +447,7 @@ export function VisitSummaryView({
           className="w-full h-12 text-sm text-white rounded-full flex items-center px-5 bg-neutral-900 active:bg-neutral-700 transition-colors"
         >
           <TbArrowBackUp className="w-4 h-4 shrink-0" aria-hidden />
-          <span className="flex-1 text-center">Go back to homepage</span>
+          <span className="flex-1 text-center">{t("visitSummary.backHome")}</span>
           <span className="w-4 shrink-0" aria-hidden />
         </button>
       </div>
