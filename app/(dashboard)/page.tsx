@@ -11,6 +11,7 @@ import { useUserMetadata } from "@/lib/firestore";
 /** Drawer menu items: add entries here to extend the menu. */
 const DRAWER_MENU_ITEMS = [
   { label: "Action Items", href: "/action-items" },
+  { label: "Health Notes", href: "/health-notes" },
 ] as const;
 
 export default function Home() {

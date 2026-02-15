@@ -293,3 +293,44 @@ export function useActionItems(): ActionItemsState {
 
   return state;
 }
+
+type HealthNotesState = {
+  healthNotes: HealthNote[];
+  loading: boolean;
+  error: Error | null;
+};
+
+/**
+ * Real-time subscription to the authenticated user's health notes only.
+ * Returns an unsubscribe on cleanup.
+ */
+export function useHealthNotes(): HealthNotesState {
+  const { user, loading: authLoading } = useAuth();
+  const uid = user?.uid ?? null;
+
+  const [state, setState] = useState<HealthNotesState>({
+    healthNotes: [],
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (authLoading || !uid) {
+      setState((s) => ({ ...s, loading: !!authLoading }));
+      return;
+    }
+
+    setState((s) => ({ ...s, loading: true, error: null }));
+
+    const unsubscribe = subscribeHealthNotes(
+      db,
+      uid,
+      (data) => setState({ healthNotes: data, loading: false, error: null }),
+      (err) => setState((s) => ({ ...s, error: err, loading: false }))
+    );
+
+    return unsubscribe;
+  }, [authLoading, uid]);
+
+  return state;
+}

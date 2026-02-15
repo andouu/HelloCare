@@ -32,7 +32,7 @@ export {
   writeSessionMetadata,
   writeUserMetadata,
 } from "./api";
-export { useUserMetadata, useSaveEntry, useUserData, useActionItems } from "./hooks";
+export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useHealthNotes } from "./hooks";
 export {
   ENTRY_FORM_CONFIGS,
   ENTRY_TYPES,
