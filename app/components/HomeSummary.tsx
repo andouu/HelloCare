@@ -8,7 +8,7 @@ import {
   useUserData,
 } from "@/lib/firestore";
 import type { ActionItem, Appointment } from "@/lib/firestore";
-import { HiArrowRight } from "react-icons/hi";
+import { HiArrowRight, HiChatAlt2, HiClipboardList, HiClock } from "react-icons/hi";
 
 /** Pill style maps for read-only display (must match action-items / past-sessions for consistency). */
 const PRIORITY_STYLES: Record<string, string> = {
@@ -183,6 +183,11 @@ export function HomeSummary({ suggestedPrompt, onPromptClick }: HomeSummaryProps
                 href={card.href}
                 className={CARD_BUTTON_CLASS}
               >
+                {card.kind === "appointment" ? (
+                  <HiClock className="h-5 w-5 shrink-0 text-neutral-900" aria-hidden />
+                ) : (
+                  <HiClipboardList className="h-5 w-5 shrink-0 text-neutral-900" aria-hidden />
+                )}
                 <span className="min-w-0 flex-1 flex flex-col gap-1.5">
                   {card.kind === "appointment" && (
                     <span
@@ -212,6 +217,7 @@ export function HomeSummary({ suggestedPrompt, onPromptClick }: HomeSummaryProps
                 onClick={() => onPromptClick(suggestedPrompt)}
                 className={CARD_BUTTON_CLASS}
               >
+                <HiChatAlt2 className="h-5 w-5 shrink-0 text-neutral-900" aria-hidden />
                 <span className="min-w-0 flex-1">{suggestedPrompt}</span>
                 <HiArrowRight className="h-4 w-4 shrink-0 text-neutral-400" />
               </button>
