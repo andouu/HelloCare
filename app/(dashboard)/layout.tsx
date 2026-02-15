@@ -16,6 +16,8 @@ const DRAWER_MENU_ITEMS = [
   { key: "drawer.appointments", href: "/appointments", icon: HiClock },
   { key: "drawer.pastSessions", href: "/past-sessions", icon: HiCalendar },
   { key: "drawer.conversation", href: "/appointments/conversation", icon: HiChatAlt2 },
+  { key: "drawer.documents", href: "/documents", icon: HiDocumentText },
+  { key: "drawer.scan_documents", href: "/scan-documents", icon: HiCamera },
 ] as const;
 
 type DrawerContextValue = {

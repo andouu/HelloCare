@@ -255,6 +255,14 @@ export async function deleteAppointment(
   return deleteUserSubcollectionDoc(db, uid, "appointments", appointmentId);
 }
 
+export async function deleteDocument(
+  db: Firestore,
+  uid: string,
+  documentId: string
+): Promise<FirestoreResult<void>> {
+  return deleteUserSubcollectionDoc(db, uid, "documents", documentId);
+}
+
 function snapshotToHealthNote(snap: DocumentSnapshot): HealthNote | null {
   const data = snap.data();
   if (!data || typeof data.userId !== "string") return null;

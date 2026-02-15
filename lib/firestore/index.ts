@@ -36,6 +36,7 @@ export {
   readUserMetadata,
   deleteActionItem,
   deleteAppointment,
+  deleteDocument,
   deleteHealthNote,
   deleteSessionMetadata,
   readAppointments,

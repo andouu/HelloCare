@@ -41,14 +41,17 @@ function LinkedDocumentCard({ doc: document }: { doc: Document }) {
     `Document from ${dateLabel}`;
   const truncated = truncateSummary(document.summary, 120);
   return (
-    <div className="w-full rounded-lg border border-neutral-200 bg-neutral-50/80 p-2.5 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+    <Link
+      href={`/documents?highlight=${encodeURIComponent(document.id)}`}
+      className="block w-full rounded-lg border border-neutral-200 bg-neutral-50/80 p-2.5 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 focus:rounded-lg"
+    >
       <p className="text-sm font-medium text-neutral-900">
         {truncateSummary(title, 60)}
       </p>
       <p className="mt-1 text-xs text-neutral-600 line-clamp-2 leading-relaxed">
         {truncated}
       </p>
-    </div>
+    </Link>
   );
 }
 
