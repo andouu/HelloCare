@@ -27,9 +27,13 @@ export async function POST(request: Request) {
   try {
     console.log(`[proposeTimeslots] Setting ${timeslots.length} timeslot(s)…`);
     await setTimeslots(timeslots.map((label) => ({ label, available: false })));
-  } catch (err) {
-    console.error("[proposeTimeslots] Failed to write timeslots to Firestore:", err);
-    return NextResponse.json({ error: "Failed to store timeslots" }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[proposeTimeslots] Failed to write timeslots to Firestore:", message, err);
+    return NextResponse.json(
+      { error: "Failed to store timeslots", detail: message },
+      { status: 500 }
+    );
   }
 
   // No availability offered — notify frontend and return immediately
