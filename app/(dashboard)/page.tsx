@@ -10,7 +10,13 @@ import { useI18n } from "@/app/components/I18nProvider";
 import { ChatWidget, HomeSummary, StreamingText } from "@/app/components";
 import { getSuggestedPrompts } from "@/app/components/HomeSummary";
 import { useDrawer } from "@/app/(dashboard)/layout";
-import { useAppointments, useUserMetadata, useUserData } from "@/lib/firestore";
+import { useToolExecutor } from "@/app/hooks/useToolExecutor";
+import { CHAT_TOOL_NAMES } from "@/lib/chat-actions";
+import {
+  useUserMetadata,
+  useUserData,
+  useAppointments,
+} from "@/lib/firestore";
 import type { UIMessage } from "ai";
 
 const SCROLL_THRESHOLD = 80;
@@ -30,13 +36,29 @@ export default function Home() {
   const router = useRouter();
   const { openDrawer } = useDrawer() ?? {};
   const { messages, sendMessage, status } = useChat();
+
+  // Scroll handling refs
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollSentinelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContentRef = useRef<HTMLDivElement>(null);
   const userAtBottomRef = useRef(true);
+
   const [isHeaderSticky, setIsHeaderSticky] = useState(false);
   const [suggestedPromptIndex, setSuggestedPromptIndex] = useState(0);
+  const [healthNoteModalOpen, setHealthNoteModalOpen] = useState(false);
+
+  // Track which tool calls have already been executed to prevent duplicates.
+  const executedToolCallsRef = useRef<Set<string>>(new Set());
+
+  // Shared tool executor
+  const { executeToolCall } = useToolExecutor({
+    onOpenHealthNoteRecorder: useCallback(() => setHealthNoteModalOpen(true), []),
+  });
+
+  // ---------------------------------------------------------------------------
+  // Build chat context (sent to API with every message)
+  // ---------------------------------------------------------------------------
 
   const chatContext = useMemo(
     () => ({
@@ -91,6 +113,37 @@ export default function Home() {
     ]
   );
 
+  // ---------------------------------------------------------------------------
+  // Scan messages for tool-call parts and execute them
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    for (const msg of messages) {
+      if (msg.role !== "assistant") continue;
+      for (const part of msg.parts ?? []) {
+        // In AI SDK v6, tool parts have type "tool-<toolName>"
+        // and fields: toolCallId, state, input.
+        // With server-side execute, state progresses to "output-available".
+        for (const toolName of CHAT_TOOL_NAMES) {
+          if (part.type !== `tool-${toolName}`) continue;
+          const { state, toolCallId, input } = part as {
+            state: string;
+            toolCallId: string;
+            input: unknown;
+          };
+          if (state !== "input-available" && state !== "output-available") continue;
+          if (executedToolCallsRef.current.has(toolCallId)) continue;
+          executedToolCallsRef.current.add(toolCallId);
+          void executeToolCall(toolName, input);
+        }
+      }
+    }
+  }, [messages, executeToolCall]);
+
+  // ---------------------------------------------------------------------------
+  // Onboarding redirect
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     if (loading) return;
     if (!isOnboarded) {
@@ -98,14 +151,18 @@ export default function Home() {
     }
   }, [loading, isOnboarded, router]);
 
+  // ---------------------------------------------------------------------------
+  // Chat send
+  // ---------------------------------------------------------------------------
+
   const handleSend = useCallback(
     (content: string) => {
       sendMessage(
         { text: content },
-        { body: { context: chatContext } }
+        { body: { context: chatContext } },
       );
     },
-    [sendMessage, chatContext]
+    [sendMessage, chatContext],
   );
 
   const suggestedPrompts = getSuggestedPrompts(t);
@@ -116,8 +173,12 @@ export default function Home() {
       handleSend(text);
       setSuggestedPromptIndex((i) => i + 1);
     },
-    [handleSend]
+    [handleSend],
   );
+
+  // ---------------------------------------------------------------------------
+  // Scroll behaviour
+  // ---------------------------------------------------------------------------
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -133,7 +194,7 @@ export default function Home() {
     if (!sentinel || !container) return;
     const observer = new IntersectionObserver(
       ([entry]) => setIsHeaderSticky(!entry.isIntersecting),
-      { root: container, rootMargin: "0px", threshold: 0 }
+      { root: container, rootMargin: "0px", threshold: 0 },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -151,6 +212,10 @@ export default function Home() {
     observer.observe(content);
     return () => observer.disconnect();
   }, [scrollToBottom, messages.length]);
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   if (loading || !isOnboarded) return null;
 
@@ -244,6 +309,8 @@ export default function Home() {
         disabled={isLoading}
         suggestedPrompt={currentSuggestedPrompt}
         onPromptClick={handlePromptClick}
+        externalRecordModalOpen={healthNoteModalOpen}
+        onRecordModalClose={() => setHealthNoteModalOpen(false)}
       />
     </div>
   );

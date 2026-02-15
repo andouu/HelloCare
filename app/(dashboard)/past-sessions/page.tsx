@@ -6,7 +6,7 @@ import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
 import { useI18n } from "@/app/components/I18nProvider";
 import { Spinner } from "@/app/components/Spinner";
 import { Toast } from "@/app/components/Toast";
-import { useDrawer } from "@/app/(dashboard)/layout";
+import { useDrawer } from "@/app/(dashboard)/DashboardShell";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import {

@@ -7,7 +7,7 @@ import { useI18n } from "@/app/components/I18nProvider";
 import { PillDropdown, type PillOption } from "@/app/components/PillDropdown";
 import { Spinner } from "@/app/components/Spinner";
 import { Toast } from "@/app/components/Toast";
-import { useDrawer } from "@/app/(dashboard)/layout";
+import { useDrawer } from "@/app/(dashboard)/DashboardShell";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import {

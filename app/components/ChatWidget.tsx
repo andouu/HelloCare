@@ -25,6 +25,10 @@ type ChatWidgetProps = {
   /** Single suggested prompt (one at a time); clicking sends that text. */
   suggestedPrompt?: string;
   onPromptClick?: (text: string) => void;
+  /** When true, opens the health-note recording modal from an external trigger (e.g. LLM tool call). */
+  externalRecordModalOpen?: boolean;
+  /** Called when the externally-triggered modal closes, so the parent can reset state. */
+  onRecordModalClose?: () => void;
 };
 
 const WAVEFORM_BARS = 40;
@@ -102,10 +106,11 @@ function RecordingWaveform({ level }: { level: number }) {
   );
 }
 
-export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }: ChatWidgetProps) {
+export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick, externalRecordModalOpen, onRecordModalClose }: ChatWidgetProps) {
   const { t, languageTag } = useI18n();
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [recordModalOpen, setRecordModalOpen] = useState(false);
+  const [internalModalOpen, setInternalModalOpen] = useState(false);
+  const recordModalOpen = internalModalOpen || (externalRecordModalOpen ?? false);
   const [inputValue, setInputValue] = useState("");
   const [audioLevel, setAudioLevel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -141,23 +146,41 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
     };
   }, []);
 
-  const handleSend = () => {
+  const stopAndSendTranscript = useCallback(async () => {
+    const transcript = (await stopRecording()).trim();
+    if (!transcript) return;
+
+    if (onSend && !disabled) {
+      onSend(transcript);
+      setInputValue("");
+      return;
+    }
+
+    // Fallback for non-chat contexts that do not provide onSend.
+    setInputValue(transcript);
+    inputRef.current?.focus();
+  }, [disabled, onSend, stopRecording]);
+
+  const handleSend = useCallback(async () => {
+    if (disabled || isStarting || isStopping) return;
+
+    if (isRecording) {
+      await stopAndSendTranscript();
+      return;
+    }
+
     const trimmed = inputValue.trim();
-    if (trimmed && onSend && !disabled && !isRecording && !isStarting && !isStopping) {
+    if (trimmed && onSend) {
       onSend(trimmed);
       setInputValue("");
     }
-  };
+  }, [disabled, isRecording, isStarting, isStopping, inputValue, onSend, stopAndSendTranscript]);
 
   const handleMicToggle = useCallback(async () => {
     if (disabled || isStarting || isStopping) return;
 
     if (isRecording) {
-      const transcript = (await stopRecording()).trim();
-      if (transcript) {
-        setInputValue(transcript);
-      }
-      inputRef.current?.focus();
+      await stopAndSendTranscript();
       return;
     }
 
@@ -173,7 +196,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
     isStarting,
     isStopping,
     startRecording,
-    stopRecording,
+    stopAndSendTranscript,
   ]);
 
   const canRecord = isSupported && tokenStatus === "ready" && !disabled;
@@ -201,7 +224,7 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setRecordModalOpen(true)}
+          onClick={() => setInternalModalOpen(true)}
           className="flex items-center gap-1.5 rounded-full bg-neutral-800 px-3 py-2.5 text-xs text-white transition-colors hover:bg-neutral-700 active:bg-neutral-700"
         >
           <HiOutlinePencil className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
@@ -240,7 +263,12 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
             ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
             type="text"
             placeholder={t("chatWidget.placeholder")}
             disabled={disabled}
@@ -249,8 +277,8 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
         )}
         <button
           type="button"
-          onClick={handleSend}
-          disabled={disabled || isWaveformMode}
+          onClick={() => void handleSend()}
+          disabled={disabled || isStarting || isStopping}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 disabled:cursor-not-allowed"
           aria-label={t("chatWidget.send")}
         >
@@ -259,7 +287,10 @@ export function ChatWidget({ onSend, disabled, suggestedPrompt, onPromptClick }:
       </div>
       <RecordHealthNoteModal
         isOpen={recordModalOpen}
-        onClose={() => setRecordModalOpen(false)}
+        onClose={() => {
+          setInternalModalOpen(false);
+          onRecordModalClose?.();
+        }}
       />
     </div>
   );

@@ -10,3 +10,4 @@ export { MarkdownContent } from "./MarkdownContent";
 export { PillDropdown } from "./PillDropdown";
 export { StreamingText } from "./StreamingText";
 export { Toast } from "./Toast";
+export { VoiceCommandFAB } from "./VoiceCommandFAB";
