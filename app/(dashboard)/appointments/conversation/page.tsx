@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { TbArrowBackUp } from "react-icons/tb";
 import { useStreamingTranscription } from "@/app/hooks/useStreamingTranscription";
 import { VIEW_CARD_CLASS, VIEW_COMPONENTS } from "./views";
-import { formatConversationDate, parseDateFromSearchParams, getTrailingWords, captureSegmentsWithInterim } from "./utils";
+import { formatConversationDate, parseDateFromSearchParams, getTrailingWords } from "./utils";
 import type { ConversationViewId } from "./types";
+import { FULL_PAGE_VIEWS } from "./types";
 
 const TRAILING_WORD_COUNT = 15;
 
@@ -29,6 +30,7 @@ export default function ConversationPage() {
     interimTranscript,
     isSupported,
     tokenStatus,
+    clearTranscript,
   } = useStreamingTranscription();
 
   const trailingWords = useMemo(
@@ -38,22 +40,48 @@ export default function ConversationPage() {
 
   const canRecord = isSupported && tokenStatus === "ready";
 
+  // ---- view transition handlers ----
+
   const handleStartRecording = useCallback(async () => {
+    clearTranscript();
     await startRecording();
     setView("recording");
-  }, [startRecording]);
+  }, [startRecording, clearTranscript]);
 
   const handleStopRecording = useCallback(async () => {
-    const items = captureSegmentsWithInterim(segments, interimTranscript);
-    setSummarySegments(items);
+    let fullTranscript = "";
     try {
-      await stopRecording();
+      fullTranscript = await stopRecording();
     } finally {
       setView("summary");
     }
-  }, [segments, interimTranscript, stopRecording]);
+    const text = fullTranscript.trim();
+    if (text) {
+      setSummarySegments((prev) => [...prev, text]);
+    }
+  }, [stopRecording]);
 
-  const cardClass = VIEW_CARD_CLASS[view];
+  const handleMarkCorrect = useCallback(() => setView("confirmed"), []);
+  const handleMarkIncorrect = useCallback(() => setView("retry"), []);
+
+  const handleRerecord = useCallback(() => {
+    clearTranscript();
+    setSummarySegments([]);
+    setView("idle");
+  }, [clearTranscript]);
+
+  const handleContinueRecording = useCallback(() => {
+    clearTranscript();
+    setView("idle");
+  }, [clearTranscript]);
+
+  const handleDone = useCallback(() => setView("visitSummary"), []);
+
+  const handleGoHome = useCallback(() => {
+    router.push("/");
+  }, [router]);
+
+  // ---- view rendering ----
 
   function renderView() {
     switch (view) {
@@ -75,12 +103,46 @@ export default function ConversationPage() {
           />
         );
       case "summary":
-        return <VIEW_COMPONENTS.summary segments={summarySegments} />;
+        return (
+          <VIEW_COMPONENTS.summary
+            segments={summarySegments}
+            onMarkCorrect={handleMarkCorrect}
+            onMarkIncorrect={handleMarkIncorrect}
+          />
+        );
+      case "retry":
+        return (
+          <VIEW_COMPONENTS.retry
+            onRerecord={handleRerecord}
+            onMarkCorrect={handleMarkCorrect}
+          />
+        );
+      case "confirmed":
+        return (
+          <VIEW_COMPONENTS.confirmed
+            onContinueRecording={handleContinueRecording}
+            onDone={handleDone}
+            onMarkIncorrect={handleMarkIncorrect}
+          />
+        );
+      case "visitSummary":
+        return (
+          <VIEW_COMPONENTS.visitSummary
+            segments={summarySegments}
+            dateLabel={dateLabel}
+            onGoHome={handleGoHome}
+          />
+        );
       default: {
         const _: never = view;
         return null;
       }
     }
+  }
+
+  // Full-page views render without the shared header/card/footer chrome
+  if (FULL_PAGE_VIEWS.has(view)) {
+    return <>{renderView()}</>;
   }
 
   return (
@@ -93,7 +155,7 @@ export default function ConversationPage() {
       </header>
 
       <div
-        className={`w-full h-full flex flex-col rounded-2xl border px-4 transition-colors overflow-hidden ${cardClass}`}
+        className={`w-full h-full flex flex-col rounded-2xl border px-4 transition-colors overflow-hidden ${VIEW_CARD_CLASS[view as keyof typeof VIEW_CARD_CLASS]}`}
       >
         {renderView()}
       </div>
