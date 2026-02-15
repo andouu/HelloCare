@@ -143,17 +143,30 @@ export default function SchedulePage() {
 
   async function startVapiCall() {
     const uid = user?.uid;
-    if (!uid) return;
+    if (!uid) { console.error("[startVapiCall] No user uid"); return; }
 
     const result = await readUserMetadata(db, uid);
     const phoneNumber = result.ok ? result.data?.hospitalPhoneNumber : undefined;
-    if (!phoneNumber) return;
+    if (!phoneNumber) { console.error("[startVapiCall] No phone number found for user", uid); return; }
 
-    await fetch("/api/vapi", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phoneNumber }),
-    });
+    const firstName = (result.ok ? result.data?.firstName : "") ?? "";
+    const lastName = (result.ok ? result.data?.lastName : "") ?? "";
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    console.log("[startVapiCall] Calling", fullName, "at", phoneNumber);
+
+    try {
+      const res = await fetch("/api/vapi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber, fullName }),
+      });
+      if (!res.ok) {
+        console.error("[startVapiCall] API returned", res.status, await res.text());
+      }
+    } catch (err) {
+      console.error("[startVapiCall] Failed to initiate outbound call:", err);
+    }
   }
 
   const handleToggleAvailability = (label: string) => {
