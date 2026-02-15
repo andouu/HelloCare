@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
 import { Spinner } from "@/app/components/Spinner";
 import { Toast } from "@/app/components/Toast";
@@ -58,17 +59,22 @@ function sortAppointmentsByClosest(appointments: Appointment[]): Appointment[] {
   });
 }
 
+const HIGHLIGHT_CLASS = "ring-2 ring-blue-500 ring-offset-2";
+
 function AppointmentCard({
   appointment,
+  highlight,
   onDelete,
 }: {
   appointment: Appointment;
+  highlight: boolean;
   onDelete: (id: string) => void;
 }) {
   const { label, pillClass } = getTimeUntil(appointment.appointmentTime);
   return (
     <article
-      className="relative rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      id={`appointment-${appointment.id}`}
+      className={`relative rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${highlight ? "border-blue-500 " + HIGHLIGHT_CLASS : "border-neutral-200"}`}
       data-appointment-id={appointment.id}
     >
       <button
@@ -120,11 +126,21 @@ function ErrorState({ message }: { message: string }) {
 }
 
 export default function AppointmentsPage() {
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const { appointments, loading, error } = useAppointments();
   const { openDrawer } = useDrawer() ?? {};
   const { user } = useAuth();
   const [operationError, setOperationError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const el = document.getElementById(`appointment-${highlightId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightId, loading]);
 
   const handleDelete = useCallback(
     async (appointmentId: string) => {
@@ -196,6 +212,7 @@ export default function AppointmentsPage() {
               <li key={appointment.id}>
                 <AppointmentCard
                   appointment={appointment}
+                  highlight={highlightId === appointment.id}
                   onDelete={handleDelete}
                 />
               </li>

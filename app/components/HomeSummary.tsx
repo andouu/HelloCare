@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { sortActionItemsByPriorityAndDueDate, useUserMetadata, useUserData } from "@/lib/firestore";
-import type { ActionItem, SessionMetadata } from "@/lib/firestore";
+import {
+  sortActionItemsByPriorityAndDueDate,
+  useAppointments,
+  useUserMetadata,
+  useUserData,
+} from "@/lib/firestore";
+import type { ActionItem, Appointment } from "@/lib/firestore";
 import { HiArrowRight } from "react-icons/hi";
 
 /** Pill style maps for read-only display (must match action-items / past-sessions for consistency). */
@@ -20,6 +25,28 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const DEFAULT_PILL_STYLE = "bg-neutral-100 text-neutral-600 border-neutral-200";
+
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
+
+/** Time-until pill label and style (matches appointments page). */
+function getTimeUntil(appointmentTime: Date): { label: string; pillClass: string } {
+  const now = Date.now();
+  const t = appointmentTime.getTime();
+  const diff = t - now;
+  if (diff <= 0) {
+    const ago = Math.abs(diff);
+    if (ago < MS_PER_HOUR) return { label: "Just passed", pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+    if (ago < MS_PER_DAY) return { label: `${Math.floor(ago / MS_PER_HOUR)}h ago`, pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+    if (ago < MS_PER_WEEK) return { label: `${Math.floor(ago / MS_PER_DAY)}d ago`, pillClass: "bg-neutral-100 text-neutral-500 border-neutral-200" };
+    return { label: "Passed", pillClass: "bg-neutral-100 text-neutral-400 border-neutral-200" };
+  }
+  if (diff < MS_PER_HOUR) return { label: "In < 1 hour", pillClass: "bg-rose-100 text-rose-800 border-rose-200" };
+  if (diff < MS_PER_DAY) return { label: `In ${Math.ceil(diff / MS_PER_HOUR)}h`, pillClass: "bg-rose-50 text-rose-700 border-rose-200" };
+  if (diff < MS_PER_WEEK) return { label: `In ${Math.ceil(diff / MS_PER_DAY)} days`, pillClass: "bg-amber-50 text-amber-800 border-amber-200" };
+  return { label: `In ${Math.ceil(diff / MS_PER_DAY)} days`, pillClass: "bg-neutral-100 text-neutral-600 border-neutral-200" };
+}
 
 /** Suggested prompts shown when chat is available; clicking sends that message. */
 export const SUGGESTED_PROMPTS = [
@@ -45,34 +72,48 @@ function formatDaysUntil(date: Date): string {
   return "";
 }
 
+/** Next upcoming appointment (soonest future), or null. */
+function getNextUpcomingAppointment(appointments: Appointment[]): Appointment | null {
+  const now = Date.now();
+  const future = appointments
+    .filter((a) => a.appointmentTime.getTime() > now)
+    .sort((a, b) => a.appointmentTime.getTime() - b.appointmentTime.getTime());
+  return future[0] ?? null;
+}
+
+function formatAppointmentLabel(appointment: Appointment): string {
+  const date = appointment.appointmentTime;
+  const days = formatDaysUntil(date);
+  const time = new Intl.DateTimeFormat("en-US", { timeStyle: "short" }).format(date);
+  if (days) return `Appointment ${days} at ${time}`;
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
 type SummaryCard =
-  | { kind: "session"; label: string; href: string }
+  | { kind: "appointment"; label: string; href: string; appointmentId: string; timeUntilLabel: string; timeUntilPillClass: string }
   | { kind: "actionItem"; label: string; href: string; item: ActionItem };
 
 function getSummaryCards(
-  sessionMetadata: SessionMetadata[],
+  appointments: Appointment[],
   actionItems: ActionItem[]
 ): SummaryCard[] {
   const cards: SummaryCard[] = [];
 
-  // Nearest upcoming session (if any)
-  const upcomingSessions = sessionMetadata
-    .filter((s) => new Date(s.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  if (upcomingSessions.length > 0) {
-    const days = formatDaysUntil(upcomingSessions[0].date);
-    if (days) {
-      cards.push({
-        kind: "session",
-        label: `You have an appointment ${days}`,
-        href: "/appointments/schedule",
-      });
-    }
+  const nextAppointment = getNextUpcomingAppointment(appointments);
+  if (nextAppointment) {
+    const { label: timeUntilLabel, pillClass: timeUntilPillClass } = getTimeUntil(nextAppointment.appointmentTime);
+    cards.push({
+      kind: "appointment",
+      label: formatAppointmentLabel(nextAppointment),
+      href: `/appointments?highlight=${encodeURIComponent(nextAppointment.id)}`,
+      appointmentId: nextAppointment.id,
+      timeUntilLabel,
+      timeUntilPillClass,
+    });
   }
 
-  // Up to 3 recent action items (by priority then soonest due first); link with highlight param
   const sortedActionItems = sortActionItemsByPriorityAndDueDate(actionItems);
-  const remaining = 3 - cards.length;
+  const remaining = 2;
   for (let i = 0; i < Math.min(remaining, sortedActionItems.length); i++) {
     const item = sortedActionItems[i];
     const label = item.title || item.description || "Action item";
@@ -119,12 +160,10 @@ type HomeSummaryProps = {
 export function HomeSummary({ suggestedPrompt, onPromptClick }: HomeSummaryProps) {
   const { data: userMetadata } = useUserMetadata();
   const userData = useUserData();
+  const { appointments } = useAppointments();
 
   const firstName = userMetadata?.firstName || "there";
-  const cards = getSummaryCards(
-    userData.sessionMetadata,
-    userData.actionItems
-  );
+  const cards = getSummaryCards(appointments, userData.actionItems);
   const showPrompt = suggestedPrompt && onPromptClick;
 
   return (
@@ -138,13 +177,21 @@ export function HomeSummary({ suggestedPrompt, onPromptClick }: HomeSummaryProps
       </p>
       {(cards.length > 0 || showPrompt) ? (
         <ul className="mt-8 w-full max-w-md flex flex-col gap-2">
-          {cards.map((card, i) => (
-            <li key={card.kind === "actionItem" ? card.item.id : i}>
+          {cards.map((card) => (
+            <li key={card.kind === "actionItem" ? card.item.id : card.appointmentId}>
               <Link
                 href={card.href}
                 className={CARD_BUTTON_CLASS}
               >
                 <span className="min-w-0 flex-1 flex flex-col gap-1.5">
+                  {card.kind === "appointment" && (
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full border px-1.5 py-px text-[10px] font-medium ${card.timeUntilPillClass}`}
+                      aria-hidden
+                    >
+                      {card.timeUntilLabel}
+                    </span>
+                  )}
                   <span>{card.label}</span>
                   {card.kind === "actionItem" && (
                     <span className="flex flex-wrap items-center gap-1.5">
