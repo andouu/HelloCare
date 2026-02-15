@@ -14,6 +14,8 @@ export type { CollectionKey, UserSubcollectionKey } from "./collections";
 export type {
   ActionItem,
   ActionItemCreate,
+  Appointment,
+  AppointmentCreate,
   EntryType,
   FirestoreResult,
   HealthNote,
@@ -32,14 +34,17 @@ export { toFirestoreValue } from "./serialize";
 export {
   readUserMetadata,
   deleteActionItem,
+  deleteAppointment,
   deleteHealthNote,
   deleteSessionMetadata,
+  readAppointments,
   writeActionItem,
+  writeAppointment,
   writeHealthNote,
   writeSessionMetadata,
   writeUserMetadata,
 } from "./api";
-export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useHealthNotes, useSessionMetadata } from "./hooks";
+export { useUserMetadata, useSaveEntry, useUserData, useActionItems, useAppointments, useHealthNotes, useSessionMetadata } from "./hooks";
 export {
   ENTRY_FORM_CONFIGS,
   ENTRY_TYPES,

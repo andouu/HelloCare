@@ -13,11 +13,13 @@ import {
   subscribeHealthNotes,
   subscribeActionItems,
   subscribeSessionMetadata,
+  subscribeAppointments,
 } from "./api";
 import { sortHealthNotesByCreatedDesc } from "./healthNotes";
 import { sortSessionsByDateDesc } from "./sessions";
 import type {
   ActionItem,
+  Appointment,
   HealthNote,
   SessionMetadata,
   UserMetadata,
@@ -333,6 +335,46 @@ export function useActionItems(): ActionItemsState {
       db,
       uid,
       (data) => setState({ actionItems: data, loading: false, error: null }),
+      (err) => setState((s) => ({ ...s, error: err, loading: false }))
+    );
+
+    return unsubscribe;
+  }, [authLoading, uid]);
+
+  return state;
+}
+
+type AppointmentsState = {
+  appointments: Appointment[];
+  loading: boolean;
+  error: Error | null;
+};
+
+/**
+ * Real-time subscription to the authenticated user's appointments.
+ */
+export function useAppointments(): AppointmentsState {
+  const { user, loading: authLoading } = useAuth();
+  const uid = user?.uid ?? null;
+
+  const [state, setState] = useState<AppointmentsState>({
+    appointments: [],
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (authLoading || !uid) {
+      setState((s) => ({ ...s, loading: !!authLoading }));
+      return;
+    }
+
+    setState((s) => ({ ...s, loading: true, error: null }));
+
+    const unsubscribe = subscribeAppointments(
+      db,
+      uid,
+      (data) => setState({ appointments: data, loading: false, error: null }),
       (err) => setState((s) => ({ ...s, error: err, loading: false }))
     );
 

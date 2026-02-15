@@ -8,6 +8,7 @@
  * - users/{uid}/healthNotes/{id}   — health notes subcollection
  * - users/{uid}/actionItems/{id}   — action items subcollection
  * - users/{uid}/sessionMetadata/{id} — session metadata subcollection
+ * - users/{uid}/appointments/{id}   — appointments subcollection
  */
 export const COLLECTIONS = {
   /** Top-level users collection: users/{uid} and subcollections under it */
@@ -24,6 +25,8 @@ export const USER_PATHS = {
   actionItems: "actionItems",
   /** Session metadata: users/{userId}/sessionMetadata/{id} */
   sessionMetadata: "sessionMetadata",
+  /** Appointments: users/{userId}/appointments/{id} */
+  appointments: "appointments",
 } as const;
 
 export type UserSubcollectionKey = keyof typeof USER_PATHS;

@@ -98,3 +98,14 @@ export type SessionMetadata = {
   actionItemIds: string[];
   documentIds: string[];
 };
+
+/** Appointment document at users/{userId}/appointments/{id}. */
+export type Appointment = {
+  id: string;
+  userId: string;
+  appointmentTime: Date;
+  scheduledOn: Date;
+};
+
+/** Create payload for appointments (id can be generated; userId set by API). */
+export type AppointmentCreate = Omit<Appointment, "userId"> & { userId?: string };

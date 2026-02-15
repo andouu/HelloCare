@@ -96,6 +96,12 @@ const sessionMetadataFields: FieldConfig[] = [
   { name: "date", label: "Date", type: "date", required: true },
 ];
 
+const appointmentFields: FieldConfig[] = [
+  { name: "title", label: "Title", type: "text", required: true, placeholder: "Visit on 2/14/2026" },
+  { name: "summary", label: "Summary", type: "textarea", placeholder: "Session summary..." },
+  { name: "date", label: "Date", type: "date", required: true },
+];
+
 export const ENTRY_FORM_CONFIGS: Record<EntryType, EntryFormConfig> = {
   healthNotes: {
     entryType: "healthNotes",
@@ -114,6 +120,12 @@ export const ENTRY_FORM_CONFIGS: Record<EntryType, EntryFormConfig> = {
     label: "Session",
     description: "Session summary and metadata.",
     fields: sessionMetadataFields,
+  },
+  appointments: {
+    entryType: "appointments",
+    label: "Appointment",
+    description: "Appointment summary and metadata.",
+    fields: appointmentFields,
   },
 };
 

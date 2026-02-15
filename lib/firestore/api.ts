@@ -26,6 +26,7 @@ import {
 import { toFirestoreValue } from "./serialize";
 import type {
   ActionItem,
+  Appointment,
   HealthNote,
   SessionMetadata,
   UserMetadata,
@@ -181,6 +182,15 @@ export async function writeSessionMetadata(
   return writeUserSubcollectionDoc(db, uid, "sessionMetadata", docData);
 }
 
+export async function writeAppointment(
+  db: Firestore,
+  uid: string,
+  data: Omit<Appointment, "userId"> & { userId?: string }
+): Promise<FirestoreResult<Appointment>> {
+  const docData: Appointment = { ...data, userId: uid };
+  return writeUserSubcollectionDoc(db, uid, "appointments", docData);
+}
+
 /**
  * Deletes a document from a user subcollection. Path: users/{uid}/{subcollection}/{docId}.
  */
@@ -221,6 +231,14 @@ export async function deleteSessionMetadata(
   sessionId: string
 ): Promise<FirestoreResult<void>> {
   return deleteUserSubcollectionDoc(db, uid, "sessionMetadata", sessionId);
+}
+
+export async function deleteAppointment(
+  db: Firestore,
+  uid: string,
+  appointmentId: string
+): Promise<FirestoreResult<void>> {
+  return deleteUserSubcollectionDoc(db, uid, "appointments", appointmentId);
 }
 
 function snapshotToHealthNote(snap: DocumentSnapshot): HealthNote | null {
@@ -294,6 +312,17 @@ function snapshotToSessionMetadata(snap: DocumentSnapshot): SessionMetadata | nu
   };
 }
 
+function snapshotToAppointment(snap: DocumentSnapshot): Appointment | null {
+  const data = snap.data();
+  if (!data || typeof data.userId !== "string") return null;
+  return {
+    id: snap.id,
+    userId: data.userId,
+    appointmentTime: toDate(data.appointmentTime),
+    scheduledOn: toDate(data.scheduledOn),
+  };
+}
+
 
 /**
  * Subscribes to a user subcollection with onSnapshot. Calls onData with parsed items
@@ -359,6 +388,19 @@ export function subscribeSessionMetadata(
   return subscribeUserSubcollection(db, uid, "sessionMetadata", snapshotToSessionMetadata, onData, onError);
 }
 
+/**
+ * Real-time subscription to appointments for the given user.
+ * Returns an unsubscribe function.
+ */
+export function subscribeAppointments(
+  db: Firestore,
+  uid: string,
+  onData: (data: Appointment[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  return subscribeUserSubcollection(db, uid, "appointments", snapshotToAppointment, onData, onError);
+}
+
 
 // These are not really necessary for now i htink, but leaving this for now (dont use these unless you want to just read once)
 /**
@@ -389,4 +431,14 @@ export async function readSessionMetadata(
   uid: string
 ): Promise<FirestoreResult<SessionMetadata[]>> {
   return readUserSubcollectionDocs(db, uid, "sessionMetadata", snapshotToSessionMetadata);
+}
+
+/**
+ * Reads all appointments for the given user from users/{uid}/appointments.
+ */
+export async function readAppointments(
+  db: Firestore,
+  uid: string
+): Promise<FirestoreResult<Appointment[]>> {
+  return readUserSubcollectionDocs(db, uid, "appointments", snapshotToAppointment);
 }
