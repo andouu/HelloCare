@@ -40,6 +40,11 @@ export type HealthNoteCreate = Omit<HealthNote, "userId">;
 /** Create payload for action items. */
 export type ActionItemCreate = Omit<ActionItem, "userId">;
 
+/** JSON-serialised action item (e.g. from API responses). Dates become ISO strings. */
+export type ActionItemSerialized = Omit<ActionItemCreate, "dueBy"> & {
+  dueBy: string | null;
+};
+
 /** Create payload for session metadata (actionItems/documentIds can default to []). */
 export type SessionMetadataCreate = Omit<SessionMetadata, "userId"> & {
   actionItems?: ActionItem[];
@@ -80,6 +85,7 @@ export type ActionItem = {
   recurrence: string;
   medication?: MedicationMetadata;
 };
+
 
 /** Session document. documentIds: optional list of stored document references. */
 export type SessionMetadata = {

@@ -133,6 +133,7 @@ export default function ConversationPage() {
           <VIEW_COMPONENTS.visitSummary
             segments={summarySegments}
             dateLabel={dateLabel}
+            appointmentDate={appointmentDate}
             onGoHome={handleGoHome}
           />
         );

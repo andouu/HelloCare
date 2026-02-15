@@ -41,6 +41,7 @@ export interface ConversationViewPropsMap {
   visitSummary: {
     segments: string[];
     dateLabel: string;
+    appointmentDate: Date;
     onGoHome: () => void;
   };
 }
