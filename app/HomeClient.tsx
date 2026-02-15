@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useUserMetadata } from "@/lib/firestore";
-import { ProfileForm, AddEntrySection, HomeLayout, HomeHero } from "@/app/components";
+import { ProfileForm, AddEntrySection, DebugDataPanel, HomeLayout, HomeHero } from "@/app/components";
+import { isDebugLoggingEnabled } from "@/lib/logger";
 
 function ProfileLoadingSpinner() {
   return (
@@ -56,7 +57,12 @@ export function HomeClient() {
           error={profileError}
         />
       )}
-      {showAddEntry && <AddEntrySection />}
+      {showAddEntry && (
+        <div className={`w-full ${isDebugLoggingEnabled ? "grid grid-cols-1 gap-6 lg:grid-cols-2" : ""}`}>
+          <AddEntrySection />
+          {isDebugLoggingEnabled && <DebugDataPanel />}
+        </div>
+      )}
 
       {showAddEntry && (
         <Link
