@@ -11,14 +11,9 @@ import { db } from "@/lib/firebase";
 import { deleteHealthNote, HEALTH_NOTE_TYPES, useHealthNotes, writeHealthNote } from "@/lib/firestore";
 import type { HealthNote } from "@/lib/firestore";
 
+/** Format as day, month, year only. */
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
-}
-
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeStyle: "short",
-  }).format(date);
 }
 
 function HealthNoteCard({
@@ -60,9 +55,6 @@ function HealthNoteCard({
         ) : null}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
           <span>Date: {formatDate(note.date)}</span>
-          <span>
-            {formatTime(note.startedAt)} – {formatTime(note.endedAt)}
-          </span>
         </div>
       </div>
     </article>
