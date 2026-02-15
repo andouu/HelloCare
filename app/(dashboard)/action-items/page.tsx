@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { HiOutlineMenuAlt4, HiOutlineTrash } from "react-icons/hi";
 import { PillDropdown } from "@/app/components/PillDropdown";
 import { Spinner } from "@/app/components/Spinner";
@@ -40,12 +41,16 @@ const PRIORITY_STYLES: Record<string, string> = {
   low: "bg-neutral-100 text-neutral-600 border-neutral-200",
 };
 
+const HIGHLIGHT_CLASS = "ring-2 ring-blue-500 ring-offset-2";
+
 function ActionItemCard({
   item,
+  highlight,
   onDelete,
   onFieldChange,
 }: {
   item: ActionItem;
+  highlight: boolean;
   onDelete: (id: string) => void;
   onFieldChange: (id: string, field: string, value: string) => void;
 }) {
@@ -53,7 +58,8 @@ function ActionItemCard({
 
   return (
     <article
-      className="relative rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      id={`action-item-${item.id}`}
+      className={`relative rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${highlight ? `border-blue-500 ${HIGHLIGHT_CLASS}` : "border-neutral-200"}`}
       data-action-item-id={item.id}
     >
       <button
@@ -133,11 +139,21 @@ function ErrorState({ message }: { message: string }) {
 }
 
 export default function ActionItemsPage() {
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const { actionItems, loading, error } = useActionItems();
   const { openDrawer } = useDrawer() ?? {};
   const { user } = useAuth();
   const [operationError, setOperationError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const el = document.getElementById(`action-item-${highlightId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightId, loading]);
 
   const handleDelete = async (itemId: string) => {
     if (!user?.uid) return;
@@ -181,7 +197,12 @@ export default function ActionItemsPage() {
     <ul className="flex flex-col gap-3 list-none p-0 m-0">
       {items.map((item) => (
         <li key={item.id}>
-          <ActionItemCard item={item} onDelete={handleDelete} onFieldChange={handleFieldChange} />
+          <ActionItemCard
+            item={item}
+            highlight={highlightId === item.id}
+            onDelete={handleDelete}
+            onFieldChange={handleFieldChange}
+          />
         </li>
       ))}
     </ul>
