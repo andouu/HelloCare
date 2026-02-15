@@ -24,6 +24,8 @@ export interface UseStreamingTranscriptionOptions {
   /** BCP-47 language tag – currently unused by AssemblyAI streaming but kept
    *  for forward-compatibility with future multi-language support. */
   language?: string;
+  /** Called with RMS audio level (0–1) during recording for visualization. */
+  onAudioLevel?: (level: number) => void;
 }
 
 export type TokenStatus = "loading" | "ready" | "error";
@@ -61,9 +63,10 @@ function float32ToInt16(float32: Float32Array): ArrayBufferLike {
 // ---------------------------------------------------------------------------
 
 export function useStreamingTranscription(
-  _options?: UseStreamingTranscriptionOptions,
+  options?: UseStreamingTranscriptionOptions,
 ): UseStreamingTranscriptionReturn {
-  void _options; // Reserved for future options
+  const onAudioLevelRef = useRef(options?.onAudioLevel);
+  onAudioLevelRef.current = options?.onAudioLevel;
   // ---- state ---------------------------------------------------------------
   const [isRecording, setIsRecording] = useState(false);
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -283,6 +286,15 @@ export function useStreamingTranscription(
         if (!transcriberRef.current) return;
         const input = event.inputBuffer.getChannelData(0);
         transcriberRef.current.sendAudio(float32ToInt16(input));
+        const cb = onAudioLevelRef.current;
+        if (cb) {
+          let sum = 0;
+          for (let i = 0; i < input.length; i++) {
+            sum += input[i] * input[i];
+          }
+          const rms = Math.sqrt(sum / input.length);
+          cb(Math.min(1, rms * 40));
+        }
       };
 
       source.connect(processor);

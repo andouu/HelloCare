@@ -8,9 +8,11 @@ import {
   HiOutlineCalendar,
   HiOutlinePencil,
 } from "react-icons/hi2";
+import { RecordHealthNoteModal } from "./RecordHealthNoteModal";
 
 export function ChatWidget() {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [recordModalOpen, setRecordModalOpen] = useState(false);
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -36,6 +38,7 @@ export function ChatWidget() {
       <div className="flex gap-2">
         <button
           type="button"
+          onClick={() => setRecordModalOpen(true)}
           className="flex items-center gap-1.5 rounded-full bg-neutral-800 px-3 py-2.5 text-xs text-white transition-colors hover:bg-neutral-700 active:bg-neutral-700"
         >
           <HiOutlinePencil className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
@@ -71,6 +74,10 @@ export function ChatWidget() {
           <HiOutlineArrowUp className="h-4 w-4" strokeWidth={3} />
         </button>
       </div>
+      <RecordHealthNoteModal
+        isOpen={recordModalOpen}
+        onClose={() => setRecordModalOpen(false)}
+      />
     </div>
   );
 }
