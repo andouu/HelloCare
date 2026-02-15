@@ -11,12 +11,20 @@ export type ChatContextAppointment = {
   scheduledOn: string;
 };
 
+/** Document summary as sent in chat context (uploadedAt as ISO string). */
+export type ChatContextDocument = {
+  id: string;
+  summary: string;
+  uploadedAt: string;
+};
+
 type ChatContext = {
   userMetadata?: UserMetadata | null;
   healthNotes?: HealthNote[];
   actionItems?: ActionItem[];
   sessionMetadata?: SessionMetadata[];
   appointments?: ChatContextAppointment[];
+  documents?: ChatContextDocument[];
   languageTag?: string;
 };
 
@@ -49,13 +57,14 @@ function buildSystemPrompt(context: ChatContext): string {
     context.languageTag ?? context.userMetadata?.preferredLanguage,
   );
   const parts: string[] = [
-    "You are a helpful, empathetic health assistant for HelloCare. You help users understand their health notes, action items, upcoming appointments, and past visits. Be concise, clear, and supportive. Do not provide medical advice—encourage users to consult their care team for medical decisions.",
+    "You are a helpful, empathetic health assistant for HelloCare. You help users understand their health notes, action items, upcoming appointments, past visits, and uploaded documents. Be concise, clear, and supportive. Do not provide medical advice—encourage users to consult their care team for medical decisions.",
     "",
     "## Critical rules",
     "- Use ONLY the information provided in the context below. Do not invent, assume, or hallucinate any data—including dates, times, appointment details, or any other facts not explicitly listed.",
     "- Do NOT make up or guess appointment dates, times, or details. Only refer to appointments that appear in the \"Upcoming appointments\" section below. If that section is empty or missing, say you don't have upcoming appointment information.",
     "- If you do not have the information needed to answer a question, say so clearly—e.g. \"I don't have that information,\" \"Not available,\" or \"I don't know.\" It is better to say you don't know than to guess.",
     "- The \"Past sessions\" section (if present) contains PAST visits/sessions only. Do NOT use it to answer questions about upcoming or future appointments. Use only the \"Upcoming appointments\" section for future appointment questions.",
+    "- For questions about the user's documents (labs, prescriptions, etc.), use ONLY the \"User documents\" section below. Do not invent or infer details not present in the provided document summaries.",
     `- Reply in ${preferredLanguage} unless the user asks for another language.`,
   ];
 
@@ -113,6 +122,18 @@ function buildSystemPrompt(context: ChatContext): string {
       ...context.sessionMetadata.map(
         (s) =>
           `- [${formatDate(s.date, preferredLanguage)}] ${s.title}: ${s.summary || "(no summary)"}`
+      )
+    );
+  }
+
+  if (context.documents && context.documents.length > 0) {
+    parts.push(
+      "",
+      "## User documents (uploaded / scanned)",
+      "The following are summaries of documents the user has uploaded (e.g. lab results, prescriptions, visit notes). Use ONLY these summaries when answering questions about the user's documents. Do not invent or infer content not present in the summaries.",
+      ...context.documents.map(
+        (d) =>
+          `- [${formatDate(d.uploadedAt, preferredLanguage)}] Document: ${d.summary}`
       )
     );
   }

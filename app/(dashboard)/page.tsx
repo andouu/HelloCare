@@ -10,7 +10,7 @@ import { useI18n } from "@/app/components/I18nProvider";
 import { ChatWidget, HomeSummary, StreamingText } from "@/app/components";
 import { getSuggestedPrompts } from "@/app/components/HomeSummary";
 import { useDrawer } from "@/app/(dashboard)/layout";
-import { useAppointments, useUserMetadata, useUserData } from "@/lib/firestore";
+import { useAppointments, useDocuments, useUserMetadata, useUserData } from "@/lib/firestore";
 import type { UIMessage } from "ai";
 
 const SCROLL_THRESHOLD = 80;
@@ -27,6 +27,7 @@ export default function Home() {
   const { loading, isOnboarded, data: userMetadata } = useUserMetadata();
   const userData = useUserData();
   const { appointments } = useAppointments();
+  const { documents } = useDocuments();
   const router = useRouter();
   const { openDrawer } = useDrawer() ?? {};
   const { messages, sendMessage, status } = useChat();
@@ -80,6 +81,11 @@ export default function Home() {
         scheduledOn:
           a.scheduledOn instanceof Date ? a.scheduledOn.toISOString() : String(a.scheduledOn),
       })),
+      documents: documents.map((d) => ({
+        id: d.id,
+        summary: d.summary,
+        uploadedAt: d.uploadedAt instanceof Date ? d.uploadedAt.toISOString() : String(d.uploadedAt),
+      })),
     }),
     [
       userMetadata,
@@ -88,6 +94,7 @@ export default function Home() {
       userData.actionItems,
       userData.sessionMetadata,
       appointments,
+      documents,
     ]
   );
 
