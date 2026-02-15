@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { createContext, useCallback, useContext, useState } from "react";
-import { HiCalendar, HiChatAlt2, HiClipboardList, HiClock, HiDocumentText, HiHome, HiLogout } from "react-icons/hi";
+import { HiCalendar, HiCamera, HiChatAlt2, HiClipboardList, HiClock, HiDocumentText, HiHome, HiLogout } from "react-icons/hi";
 import { useI18n } from "@/app/components/I18nProvider";
 import { Drawer } from "@/app/components";
 import { Spinner } from "@/app/components/Spinner";

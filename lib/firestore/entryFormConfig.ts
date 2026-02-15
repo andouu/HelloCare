@@ -127,6 +127,12 @@ export const ENTRY_FORM_CONFIGS: Record<EntryType, EntryFormConfig> = {
     description: "Appointment summary and metadata.",
     fields: appointmentFields,
   },
+  documents: {
+    entryType: "documents",
+    label: "Document",
+    description: "Created via Capture document (photo + LLM summary).",
+    fields: [],
+  },
 };
 
 export const ENTRY_TYPES: EntryType[] = ["healthNotes", "actionItems", "sessionMetadata"];
@@ -166,6 +172,9 @@ export function getDefaultValues(entryType: EntryType): Record<string, string> {
         summary: "",
         date: today,
       };
+    case "appointments":
+    case "documents":
+      return {};
     default:
       return {};
   }
@@ -212,6 +221,9 @@ export function formValuesToEntryPayload(
         actionItemIds: [],
         documentIds: [],
       };
+    case "appointments":
+    case "documents":
+      throw new Error(`Entry type "${entryType}" is not created via the entry form.`);
     default:
       throw new Error(`Unknown entry type: ${entryType}`);
   }

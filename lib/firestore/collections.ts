@@ -27,6 +27,8 @@ export const USER_PATHS = {
   sessionMetadata: "sessionMetadata",
   /** Appointments: users/{userId}/appointments/{id} */
   appointments: "appointments",
+  /** Documents: users/{userId}/documents/{id} */
+  documents: "documents",
 } as const;
 
 export type UserSubcollectionKey = keyof typeof USER_PATHS;

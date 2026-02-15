@@ -15,12 +15,42 @@ import {
   ACTION_ITEM_TYPES,
   deleteSessionMetadata,
   useActionItems,
+  useDocuments,
   useSessionMetadata,
   writeActionItem,
 } from "@/lib/firestore";
-import type { ActionItem, SessionMetadata } from "@/lib/firestore";
+import type { ActionItem, Document, SessionMetadata } from "@/lib/firestore";
 import { PillDropdown } from "@/app/components/PillDropdown";
 import type { MessageKey } from "@/lib/i18n/messages";
+
+/** Truncate text to a max length with ellipsis. */
+function truncateSummary(text: string, maxLength: number): string {
+  const t = text.trim();
+  if (t.length <= maxLength) return t;
+  return t.slice(0, maxLength).trim() + "…";
+}
+
+function LinkedDocumentCard({ doc: document }: { doc: Document }) {
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(document.uploadedAt);
+  const title =
+    document.summary.trim().split(/\n/)[0]?.slice(0, 50)?.trim() ||
+    `Document from ${dateLabel}`;
+  const truncated = truncateSummary(document.summary, 120);
+  return (
+    <div className="w-full rounded-lg border border-neutral-200 bg-neutral-50/80 p-2.5 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+      <p className="text-sm font-medium text-neutral-900">
+        {truncateSummary(title, 60)}
+      </p>
+      <p className="mt-1 text-xs text-neutral-600 line-clamp-2 leading-relaxed">
+        {truncated}
+      </p>
+    </div>
+  );
+}
 
 const PRIORITY_STYLES: Record<string, string> = {
   high: "bg-rose-100 text-rose-800 border-rose-200",
@@ -86,6 +116,7 @@ function SessionCard({
   linkedActionItems,
   formatDate,
   t,
+  linkedDocuments,
   onDelete,
   onActionItemFieldChange,
 }: {
@@ -93,6 +124,7 @@ function SessionCard({
   linkedActionItems: ActionItem[];
   formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
+  linkedDocuments: Document[];
   onDelete: (id: string) => void;
   onActionItemFieldChange: (id: string, field: string, value: string) => void;
 }) {
@@ -138,6 +170,16 @@ function SessionCard({
             </div>
           </div>
         ) : null}
+        {linkedDocuments.length > 0 ? (
+          <div className="mt-2 w-full">
+            <p className="text-xs font-medium text-neutral-500 mb-1.5">Linked documents</p>
+            <div className="flex flex-col gap-2 w-full">
+              {linkedDocuments.map((doc) => (
+                <LinkedDocumentCard key={doc.id} doc={doc} />
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -173,6 +215,7 @@ export default function PastSessionsPage() {
   const { t, formatDate } = useI18n();
   const { sessionMetadata, loading, error } = useSessionMetadata();
   const { actionItems } = useActionItems();
+  const { documents } = useDocuments();
   const { openDrawer } = useDrawer() ?? {};
   const { user } = useAuth();
   const uid = user?.uid;
@@ -187,6 +230,14 @@ export default function PastSessionsPage() {
     return map;
   }, [actionItems]);
 
+  const documentsById = useMemo(() => {
+    const map = new Map<string, Document>();
+    for (const d of documents) {
+      map.set(d.id, d);
+    }
+    return map;
+  }, [documents]);
+
   const getLinkedActionItems = useCallback(
     (session: SessionMetadata): ActionItem[] => {
       return session.actionItemIds
@@ -194,6 +245,15 @@ export default function PastSessionsPage() {
         .filter((item): item is ActionItem => item != null);
     },
     [actionItemsById]
+  );
+
+  const getLinkedDocuments = useCallback(
+    (session: SessionMetadata): Document[] => {
+      return session.documentIds
+        .map((id) => documentsById.get(id))
+        .filter((doc): doc is Document => doc != null);
+    },
+    [documentsById]
   );
 
   const handleDelete = async (sessionId: string) => {
@@ -271,6 +331,7 @@ export default function PastSessionsPage() {
                   linkedActionItems={getLinkedActionItems(session)}
                   formatDate={formatDate}
                   t={t}
+                  linkedDocuments={getLinkedDocuments(session)}
                   onDelete={handleDelete}
                   onActionItemFieldChange={handleActionItemFieldChange}
                 />

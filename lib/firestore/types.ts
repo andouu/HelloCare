@@ -109,3 +109,11 @@ export type Appointment = {
 
 /** Create payload for appointments (id can be generated; userId set by API). */
 export type AppointmentCreate = Omit<Appointment, "userId"> & { userId?: string };
+
+/** Document at users/{userId}/documents/{id}. Summary from LLM over uploaded images. */
+export type Document = {
+  id: string;
+  userId: string;
+  summary: string;
+  uploadedAt: Date;
+};
