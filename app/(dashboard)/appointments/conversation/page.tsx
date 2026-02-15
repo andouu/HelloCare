@@ -155,7 +155,7 @@ export default function ConversationPage() {
         <button
           type="button"
           onClick={() => openDrawer?.()}
-          className="p-2 -ml-2 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          className="p-2 -ml-2 rounded-lg text-neutral-900 hover:bg-neutral-100 transition-colors"
           aria-label="Open menu"
         >
           <HiOutlineMenuAlt4 className="w-6 h-6" />

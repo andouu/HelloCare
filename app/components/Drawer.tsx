@@ -1,6 +1,5 @@
 'use client';
 
-import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -114,7 +113,7 @@ export function Drawer({
           {/* Panel */}
           <motion.div
             key="panel"
-            className={`fixed z-50 w-full max-w-[320px] bg-background shadow-xl ${config.panel}`}
+            className={`fixed z-50 flex h-full w-full max-w-[320px] flex-col bg-background shadow-xl ${config.panel}`}
             initial={config.initial}
             animate={config.animate}
             exit={config.exit}
@@ -143,7 +142,7 @@ export function Drawer({
                         {getInitials(userName)}
                       </div>
                     )}
-                    <span id="drawer-title" className="text-base font-medium text-neutral-700">
+                    <span id="drawer-title" className="tracking-tight font-bold text-neutral-900">
                       {userName}
                     </span>
                   </>
@@ -166,7 +165,7 @@ export function Drawer({
                 <HiX className="h-5 w-5" />
               </button>
             </div>
-            <div className="overflow-y-auto p-4">{children}</div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">{children}</div>
           </motion.div>
         </>
       )}
