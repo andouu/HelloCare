@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { HiOutlineMenuAlt4 } from "react-icons/hi";
 import { Spinner } from "@/app/components/Spinner";
+import { useDrawer } from "@/app/(dashboard)/layout";
 import { useActionItems } from "@/lib/firestore";
 import type { ActionItem } from "@/lib/firestore";
 
@@ -92,22 +93,25 @@ function ErrorState({ message }: { message: string }) {
 }
 
 export default function ActionItemsPage() {
-  const router = useRouter();
   const { actionItems, loading, error } = useActionItems();
+  const { openDrawer } = useDrawer() ?? {};
 
   return (
-    <div className="w-full min-h-screen flex flex-col gap-6 p-4">
-      <div className="flex flex-col gap-1">
+    <div className="w-full min-h-screen flex flex-col">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
         <button
           type="button"
-          onClick={() => router.push("/")}
-          className="self-start text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+          onClick={() => openDrawer?.()}
+          className="p-2 -ml-2 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          aria-label="Open menu"
         >
-          ← Back to Home
+          <HiOutlineMenuAlt4 className="w-6 h-6" />
         </button>
-        <h1 className="text-xl font-bold tracking-tight text-neutral-900">
-          Action Items
-        </h1>
+        <h1 className="text-lg font-semibold text-neutral-900">Action Items</h1>
+        <div className="w-10" aria-hidden />
+      </header>
+      <div className="flex-1 flex flex-col gap-6 p-4 overflow-auto">
+      <div className="flex flex-col gap-1">
         <p className="text-sm text-neutral-500">
           Follow-ups and tasks from your care team, updated in real time.
         </p>
@@ -133,6 +137,7 @@ export default function ActionItemsPage() {
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }
