@@ -128,7 +128,7 @@ export function Drawer({
                 {userName != null ? (
                   <>
                     {userAvatarUrl ? (
-                      <Image
+                      <img
                         src={userAvatarUrl}
                         alt=""
                         width={32}
