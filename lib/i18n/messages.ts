@@ -154,6 +154,9 @@ export const EN_MESSAGES = {
   "schedule.loading.5": "Higgledy-piggledying...",
   "schedule.loading.6": "Skedaddling...",
   "schedule.loading.7": "Lollygagging...",
+  "schedule.noAvailability": "No available time slots were found. Try again or contact your provider directly.",
+  "schedule.completed": "Your appointment has been confirmed!",
+  "schedule.error": "Something went wrong. Please try again.",
 
   "conversation.title": "Conversation",
   "conversation.subtitle": "This conversation is about a doctor's visit on {date}",
@@ -369,6 +372,9 @@ export const ES_MESSAGES: Partial<Record<keyof typeof EN_MESSAGES, string>> = {
   "schedule.loading.5": "Afinando detalles...",
   "schedule.loading.6": "Conectando...",
   "schedule.loading.7": "Confirmando disponibilidad...",
+  "schedule.noAvailability": "No se encontraron horarios disponibles. Intenta de nuevo o contacta a tu proveedor directamente.",
+  "schedule.completed": "¡Tu cita ha sido confirmada!",
+  "schedule.error": "Algo salió mal. Por favor, intenta de nuevo.",
 
   "conversation.title": "Conversación",
   "conversation.subtitle": "Esta conversación es sobre una visita médica del {date}",
@@ -584,6 +590,9 @@ export const ZH_MESSAGES: Partial<Record<keyof typeof EN_MESSAGES, string>> = {
   "schedule.loading.5": "正在确认细节...",
   "schedule.loading.6": "正在连接...",
   "schedule.loading.7": "正在确认可用性...",
+  "schedule.noAvailability": "未找到可用时间段。请重试或直接联系您的医疗机构。",
+  "schedule.completed": "您的预约已确认！",
+  "schedule.error": "出现问题，请重试。",
 
   "conversation.title": "对话",
   "conversation.subtitle": "本次对话对应就诊日期：{date}",

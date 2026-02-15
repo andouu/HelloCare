@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { HiCheck, HiPhone, HiPhoneMissedCall } from "react-icons/hi";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
-import { readUserMetadata } from "@/lib/firestore";
+import { readUserMetadata, writeAppointment } from "@/lib/firestore";
 
 type SchedulingStateType = "idle" | "scheduling" | "awaiting_confirmation" | "no_availability" | "completed" | "error";
 
@@ -53,6 +53,23 @@ function IdleState({ text }: { text: string }) {
   return <span className="text-center text-sm max-w-xs">{text}</span>;
 }
 
+function NoAvailabilityState({ text }: { text: string }) {
+  return <span className="text-center text-sm max-w-xs">{text}</span>;
+}
+
+function CompletedState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <HiCheck className="w-10 h-10" />
+      <span className="text-center text-sm max-w-xs">{text}</span>
+    </div>
+  );
+}
+
+function ErrorState({ text }: { text: string }) {
+  return <span className="text-center text-sm max-w-xs">{text}</span>;
+}
+
 function SchedulingState({ theme, loadingTexts }: { theme: StateTheme; loadingTexts: string[] }) {
   const [index, setIndex] = useState(0);
 
@@ -85,6 +102,7 @@ function AwaitingConfirmationState({
   title,
   subtitle,
   proceedLabel,
+  formatLabel,
 }: {
   timeslots: Timeslot[];
   onToggleAvailability: (label: string) => void;
@@ -92,6 +110,7 @@ function AwaitingConfirmationState({
   title: string;
   subtitle: string;
   proceedLabel: string;
+  formatLabel: (isoLabel: string) => string;
 }) {
   const hasSelection = timeslots.some((s) => s.available);
 
@@ -109,7 +128,7 @@ function AwaitingConfirmationState({
             onClick={() => onToggleAvailability(slot.label)}
             className={`relative w-full h-12 border rounded-full flex items-center justify-center cursor-pointer active:opacity-80 transition-opacity ${slot.available ? "bg-white text-neutral-900 border-white" : "border-white"}`}
           >
-            {slot.label}
+            {formatLabel(slot.label)}
             {slot.available && (
               <HiCheck className="absolute right-4 w-5 h-5 text-neutral-900" />
             )}
@@ -129,14 +148,12 @@ function AwaitingConfirmationState({
 }
 
 export default function SchedulePage() {
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
   const router = useRouter();
   const { user } = useAuth();
   const [schedulingState, setSchedulingState] = useState<SchedulingStateType>("idle");
   const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
-  /* eslint-disable @typescript-eslint/no-unused-vars -- reserved for future implementation */
   const [error, setError] = useState<string | null>(null);
-  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   const loadingTexts = useMemo(
     () => [
@@ -204,12 +221,26 @@ export default function SchedulePage() {
     const selected = timeslots.find((s) => s.available);
     if (!selected) return;
 
+    const uid = user?.uid;
+    if (!uid) { console.error("[handleProceed] No user uid"); return; }
+
     try {
       await fetch("/api/confirmTimeslot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label: selected.label }),
       });
+
+      const result = await writeAppointment(db, uid, {
+        id: crypto.randomUUID(),
+        appointmentTime: new Date(selected.label),
+        scheduledOn: new Date(),
+      });
+
+      if (!result.ok) {
+        console.error("[handleProceed] Failed to write appointment:", result.error);
+      }
+
       setSchedulingState("completed");
     } catch (err) {
       console.error("[handleProceed] Failed to confirm timeslot:", err);
@@ -237,9 +268,14 @@ export default function SchedulePage() {
             title={t("schedule.slotsTitle")}
             subtitle={t("schedule.slotsSubtitle")}
             proceedLabel={t("schedule.proceed")}
+            formatLabel={(iso) => formatDate(iso, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
           />
         ) : schedulingState === "no_availability" ? (
-          <NoAvailabilityState />
+          <NoAvailabilityState text={t("schedule.noAvailability")} />
+        ) : schedulingState === "completed" ? (
+          <CompletedState text={t("schedule.completed")} />
+        ) : schedulingState === "error" ? (
+          <ErrorState text={error ?? t("schedule.error")} />
         ) : (
           <IdleState text={t("schedule.idle")} />
         )}
