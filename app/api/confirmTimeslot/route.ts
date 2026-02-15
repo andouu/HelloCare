@@ -20,9 +20,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "label is required" }, { status: 400 });
   }
 
-  console.log(`[confirmTimeslot] Confirming timeslot: "${label}"`);
-  confirmTimeslot(label);
-  console.log("[confirmTimeslot] ✅ Done");
-
-  return NextResponse.json({ ok: true });
+  try {
+    console.log(`[confirmTimeslot] Confirming timeslot: "${label}"`);
+    await confirmTimeslot(label);
+    console.log("[confirmTimeslot] ✅ Done");
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[confirmTimeslot] Failed to confirm:", err);
+    return NextResponse.json({ error: "Failed to confirm timeslot" }, { status: 500 });
+  }
 }

@@ -3,6 +3,7 @@
 import { Spinner } from "@/app/components/Spinner";
 import { useI18n } from "@/app/components/I18nProvider";
 import { useRouter } from "next/navigation";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { HiCheck, HiPhone, HiPhoneMissedCall } from "react-icons/hi";
 import { useAuth } from "@/lib/auth-context";
@@ -168,30 +169,41 @@ export default function SchedulePage() {
     [t]
   );
 
-  // Subscribe to the SSE timeslot stream while scheduling
+  // Subscribe to Firestore _scheduling/current doc while scheduling.
+  // Ignore stale data written before this session started.
   useEffect(() => {
     if (schedulingState !== "scheduling") return;
 
-    console.log("[schedule] Opening SSE connection to /api/timeslots/stream");
-    const es = new EventSource("/api/timeslots/stream");
+    const subscribedAt = Date.now();
+    console.log("[schedule] Subscribing to Firestore _scheduling/current");
 
-    es.onopen = () => console.log("[schedule] SSE connection opened");
+    const unsubscribe = onSnapshot(
+      doc(db, "_scheduling", "current"),
+      (snap) => {
+        const data = snap.data();
+        console.log("[schedule] Firestore snapshot:", data);
+        if (!data?.timeslots) return; // doc doesn't exist yet
 
-    es.onmessage = (e) => {
-      console.log("[schedule] SSE message received:", e.data);
-      const slots: Timeslot[] = JSON.parse(e.data);
-      console.log(`[schedule] Parsed ${slots.length} timeslot(s)`, slots);
-      setTimeslots(slots);
-      setSchedulingState(slots.length > 0 ? "awaiting_confirmation" : "no_availability");
-    };
+        // Skip stale data from a previous scheduling session
+        const updatedAt: number = data.updatedAt?.toMillis?.() ?? 0;
+        if (updatedAt < subscribedAt) {
+          console.log("[schedule] Ignoring stale snapshot (updatedAt:", updatedAt, "subscribedAt:", subscribedAt, ")");
+          return;
+        }
 
-    es.onerror = (err) => {
-      console.error("[schedule] SSE error:", err);
-    };
+        const slots: Timeslot[] = data.timeslots;
+        console.log(`[schedule] Received ${slots.length} timeslot(s)`, slots);
+        setTimeslots(slots);
+        setSchedulingState(slots.length > 0 ? "awaiting_confirmation" : "no_availability");
+      },
+      (err) => {
+        console.error("[schedule] Firestore onSnapshot error:", err);
+      }
+    );
 
     return () => {
-      console.log("[schedule] Closing SSE connection");
-      es.close();
+      console.log("[schedule] Unsubscribing from Firestore");
+      unsubscribe();
     };
   }, [schedulingState]);
 
@@ -206,7 +218,7 @@ export default function SchedulePage() {
     const firstName = (result.ok ? result.data?.firstName : "") ?? "";
     const lastName = (result.ok ? result.data?.lastName : "") ?? "";
     const fullName = `${firstName} ${lastName}`.trim();
-return;
+
     try {
       const res = await fetch("/api/vapi", {
         method: "POST",

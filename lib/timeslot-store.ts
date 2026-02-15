@@ -1,62 +1,106 @@
-import { EventEmitter } from "events";
+/**
+ * Timeslot coordination store – backed by Firestore (via Admin SDK)
+ * so that all Vercel serverless functions share the same state.
+ *
+ * Firestore document: _scheduling/current
+ * Fields:
+ *   timeslots       – Timeslot[]
+ *   confirmedLabel  – string | null
+ *   updatedAt       – Timestamp
+ */
+
+import { getAdminDb } from "./firebase-admin";
 
 export type Timeslot = { label: string; available: boolean };
 
-const g = globalThis as unknown as {
-  __tsEmitter?: EventEmitter;
-  __tsData?: Timeslot[];
-  __tsConfirmResolve?: ((label: string) => void) | null;
-};
-if (!g.__tsEmitter) g.__tsEmitter = new EventEmitter();
-if (!g.__tsData) g.__tsData = [];
+const SCHEDULING_DOC = "_scheduling/current";
 
-export const emitter = g.__tsEmitter;
-
-export function setTimeslots(slots: Timeslot[]) {
-  console.log(`[timeslot-store] setTimeslots called with ${slots.length} slot(s):`, JSON.stringify(slots));
-  g.__tsData = slots;
-  emitter.emit("update", slots);
-  console.log(`[timeslot-store] Emitted "update" event. Listener count: ${emitter.listenerCount("update")}`);
+function docRef() {
+  return getAdminDb().doc(SCHEDULING_DOC);
 }
 
-export function getTimeslots(): Timeslot[] {
-  const slots = g.__tsData ?? [];
-  console.log(`[timeslot-store] getTimeslots → ${slots.length} slot(s)`);
+/* ------------------------------------------------------------------ */
+/*  Write helpers (called from API routes)                            */
+/* ------------------------------------------------------------------ */
+
+/** Store proposed timeslots and reset any previous confirmation. */
+export async function setTimeslots(slots: Timeslot[]): Promise<void> {
+  console.log(
+    `[timeslot-store] setTimeslots: ${slots.length} slot(s)`,
+    JSON.stringify(slots)
+  );
+  await docRef().set(
+    { timeslots: slots, confirmedLabel: null, updatedAt: new Date() },
+    { merge: false }
+  );
+  console.log("[timeslot-store] Firestore document written ✅");
+}
+
+/** Read current timeslots from Firestore. */
+export async function getTimeslots(): Promise<Timeslot[]> {
+  const snap = await docRef().get();
+  const data = snap.data();
+  const slots = (data?.timeslots ?? []) as Timeslot[];
+  console.log(`[timeslot-store] getTimeslots: ${slots.length} slot(s)`);
   return slots;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Confirmation flow                                                 */
+/* ------------------------------------------------------------------ */
+
 /**
- * Returns a promise that resolves with the confirmed slot label
- * once `confirmTimeslot` is called, or rejects if `timeoutMs` elapses first.
+ * Blocks until the user confirms a timeslot (or timeout).
+ * Uses Firestore onSnapshot so it works across serverless invocations.
  */
 export function waitForConfirmation(timeoutMs: number): Promise<string> {
-  console.log(`[timeslot-store] waitForConfirmation started (timeout: ${timeoutMs}ms)`);
+  console.log(
+    `[timeslot-store] waitForConfirmation started (timeout: ${timeoutMs}ms)`
+  );
+
   return new Promise<string>((resolve, reject) => {
+    let settled = false;
+
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
       console.error("[timeslot-store] ⏰ waitForConfirmation timed out");
-      g.__tsConfirmResolve = null;
       reject(new Error("Confirmation timed out"));
     }, timeoutMs);
 
-    g.__tsConfirmResolve = (label: string) => {
-      console.log(`[timeslot-store] ✅ Confirmation received for: "${label}"`);
-      clearTimeout(timer);
-      resolve(label);
-    };
-    console.log("[timeslot-store] __tsConfirmResolve callback registered, waiting…");
+    const unsubscribe = docRef().onSnapshot(
+      (snap) => {
+        if (settled) return;
+        const data = snap.data();
+        const confirmed = data?.confirmedLabel;
+        if (confirmed) {
+          settled = true;
+          clearTimeout(timer);
+          unsubscribe();
+          console.log(
+            `[timeslot-store] ✅ Confirmation received: "${confirmed}"`
+          );
+          resolve(confirmed);
+        }
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unsubscribe();
+        console.error("[timeslot-store] onSnapshot error:", err);
+        reject(err);
+      }
+    );
   });
 }
 
 /**
- * Called by the frontend (via API) to confirm the selected timeslot.
- * Resolves the pending `waitForConfirmation` promise.
+ * Mark a timeslot as confirmed (called from confirmTimeslot API route).
  */
-export function confirmTimeslot(label: string) {
-  console.log(`[timeslot-store] confirmTimeslot called for: "${label}". Resolver exists: ${!!g.__tsConfirmResolve}`);
-  if (g.__tsConfirmResolve) {
-    g.__tsConfirmResolve(label);
-    g.__tsConfirmResolve = null;
-  } else {
-    console.warn("[timeslot-store] ⚠️ No pending confirmation resolver – confirmation ignored!");
-  }
+export async function confirmTimeslot(label: string): Promise<void> {
+  console.log(`[timeslot-store] confirmTimeslot: "${label}"`);
+  await docRef().update({ confirmedLabel: label });
+  console.log("[timeslot-store] confirmedLabel written ✅");
 }

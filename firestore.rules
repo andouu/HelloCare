@@ -7,6 +7,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Scheduling coordination doc – written by Admin SDK (server),
+    // readable by any authenticated user on the frontend.
+    match /_scheduling/{doc} {
+      allow read: if request.auth != null;
+    }
+
     // User-private data: only the owner can read/write.
     // Document validation: required fields and allowed keys only.
     match /users/{userId} {
