@@ -1,30 +1,27 @@
 'use client';
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { HiMicrophone } from "react-icons/hi";
 import { HiOutlineArrowUp } from "react-icons/hi2";
 
 export function ChatWidget() {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
-  const updateKeyboardOffset = useCallback(() => {
-    if (typeof window === "undefined" || !window.visualViewport) return;
-    const vv = window.visualViewport;
-    const keyboardHeight = Math.max(0, window.innerHeight - vv.height);
-    setKeyboardOffset(keyboardHeight);
-  }, []);
-
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    updateKeyboardOffset();
-    vv.addEventListener("resize", updateKeyboardOffset);
-    vv.addEventListener("scroll", updateKeyboardOffset);
-    return () => {
-      vv.removeEventListener("resize", updateKeyboardOffset);
-      vv.removeEventListener("scroll", updateKeyboardOffset);
+    const update = () => {
+      const keyboardHeight = Math.max(0, window.innerHeight - vv.height);
+      setKeyboardOffset(keyboardHeight);
     };
-  }, [updateKeyboardOffset]);
+    queueMicrotask(update);
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
 
   return (
     <div

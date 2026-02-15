@@ -58,6 +58,7 @@ function float32ToInt16(float32: Float32Array): ArrayBufferLike {
 export function useStreamingTranscription(
   _options?: UseStreamingTranscriptionOptions,
 ): UseStreamingTranscriptionReturn {
+  void _options; // Reserved for future options
   // ---- state ---------------------------------------------------------------
   const [isRecording, setIsRecording] = useState(false);
   const [segments, setSegments] = useState<Segment[]>([]);

@@ -1,11 +1,14 @@
 'use client';
 
+import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { HiX } from "react-icons/hi";
 
 type DrawerSide = "left" | "right" | "top" | "bottom";
+
+type AnimationTarget = { x?: string | number; y?: string | number };
 
 interface DrawerProps {
   open: boolean;
@@ -23,7 +26,7 @@ interface DrawerProps {
 
 const sideConfig: Record<
   DrawerSide,
-  { panel: string; overlay: string; initial: object; animate: object; exit: object }
+  { panel: string; overlay: string; initial: AnimationTarget; animate: AnimationTarget; exit: AnimationTarget }
 > = {
   left: {
     panel: "left-0 top-0 h-full",
@@ -125,9 +128,11 @@ export function Drawer({
                 {userName != null ? (
                   <>
                     {userAvatarUrl ? (
-                      <img
+                      <Image
                         src={userAvatarUrl}
                         alt=""
+                        width={32}
+                        height={32}
                         className="h-8 w-8 rounded-full object-cover"
                       />
                     ) : (

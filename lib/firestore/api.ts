@@ -13,7 +13,6 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import {
-  COLLECTIONS,
   userDocRefSegments,
   userSubcollectionDocRefSegments,
   type UserSubcollectionKey,
