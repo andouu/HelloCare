@@ -59,7 +59,7 @@ const actionItemOutputSchema = z.object({
   dueBy: z
     .string()
     .describe(
-      "When this should be completed. Use ISO 8601 date format (YYYY-MM-DD) if a specific timeframe was mentioned, calculated relative to the visit date. Use 'N/A' if no timeframe was discussed.",
+      "When this should be completed. Use ISO 8601 (YYYY-MM-DD) only when the transcript explicitly states a due date or timeframe; otherwise use exactly 'N/A'. Do not infer or guess a date.",
     ),
   medication: medicationOutputSchema
     .nullable()
@@ -126,7 +126,7 @@ Extract every task, instruction, recommendation, or follow-up the patient should
 - **description**: Detailed explanation of what the patient needs to do. Include any mentioned specifics: timing, frequency, conditions, warnings, and contraindications.
 - **priority**: "high" for urgent or time-sensitive actions (e.g. stop a medication, go to ER if symptoms worsen), "medium" for standard follow-ups and routine tasks, "low" for optional suggestions or long-term lifestyle changes.
 - **recurrence**: "once", "daily", "twice daily", "weekly", "monthly", "as needed", or "N/A" if not discussed.
-- **dueBy**: Convert any mentioned timeframe to ISO 8601 (YYYY-MM-DD) relative to the visit date. For example, "come back in two weeks" from a visit on 2026-02-14 becomes "2026-02-28". Use "N/A" if no timeframe was mentioned.
+- **dueBy**: Use a date ONLY when the transcript explicitly states a due date or timeframe (e.g. "come back in two weeks", "by next Monday"). Convert that to ISO 8601 (YYYY-MM-DD) relative to the visit date. If no due date or timeframe was mentioned for an action item, you MUST use exactly "N/A". Do NOT infer, guess, or default to any date (e.g. do not assume "in a week" or "next month"). When in doubt, use "N/A". All action items without a stated due date must have dueBy "N/A".
 - **medication**: Include ONLY when a specific medication is discussed. Set to null for non-medication action items. When included, populate every sub-field; use "N/A" for unknown strings and 0 for unknown numbers.
 
 ## Critical rules:
@@ -134,7 +134,7 @@ Extract every task, instruction, recommendation, or follow-up the patient should
 1. ONLY extract information that is EXPLICITLY stated or CLEARLY implied in the transcript.
 2. Use "N/A" for any string field where the information is not available in the transcript.
 3. Use 0 for any numeric field where the information is not available in the transcript.
-4. Do NOT hallucinate or guess medication names, dosages, dates, or any clinical details.
+4. Do NOT hallucinate or guess medication names, dosages, dates, or any clinical details. For dueBy, use "N/A" whenever the transcript does not explicitly state when the action is due; never invent a due date.
 5. If no actionable items were discussed, return an empty actionItems array.
 6. Be exhaustive — capture ALL topics and ALL action items. Do not omit anything that was discussed.
 7. If the transcript is empty, too short (under ~10 words), or contains no medical content, return status "NOT_ENOUGH_DATA" with empty arrays.

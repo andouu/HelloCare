@@ -4,15 +4,25 @@ import {
   type ActionItemOutput,
 } from "@/lib/llm/queries/visit-summary";
 
+/** True if the string looks like a YYYY-MM-DD date (no time, no inferred defaults). */
+function isExplicitIsoDateOnly(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
+}
+
 /**
  * Converts an LLM-produced action item into the shape expected by the client.
- * Adds a generated `id`, normalises `dueBy` to an ISO string, and defaults
- * `status` to "pending".
+ * Adds a generated `id`, normalises `dueBy` to an ISO string only when the LLM
+ * returned an explicit date, and defaults `status` to "pending".
  */
 function toActionItem(item: ActionItemOutput) {
   let dueBy: string | null = null;
-  if (item.dueBy !== "N/A") {
-    const parsed = new Date(item.dueBy);
+  const raw = item.dueBy?.trim() ?? "";
+  if (
+    raw !== "" &&
+    raw.toUpperCase() !== "N/A" &&
+    isExplicitIsoDateOnly(raw)
+  ) {
+    const parsed = new Date(raw);
     if (!Number.isNaN(parsed.getTime())) {
       dueBy = parsed.toISOString();
     }
